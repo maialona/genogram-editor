@@ -46,10 +46,30 @@ npm run build
 
 | 步驟 | 方式 |
 |------|------|
-| 建立 | 拖曳符號 / 載入示範 / 匯入 JSON |
+| 建立 | 拖曳符號 / 載入示範 / 匯入 JSON / **AI 描述產生** |
 | 編輯 | 畫布操作 + 右側屬性 |
 | 確認已存 | 工具列顯示「已儲存 · 剛剛」（LocalStorage） |
 | 交付 | 工具列「匯出」→ PNG / SVG / JSON |
+
+## AI 產生家系圖
+
+底部 chatbox 用自然語言描述個案家庭關係，AI 會解析人物與關係並自動排版到畫布。
+
+1. `npm run dev` 啟動（建議開啟「使用本機代理」以避免瀏覽器 CORS）
+2. 點 chatbox 左下角模型名稱 → **AI 設定**
+3. 貼上你自己的 API Key（存在本機 `localStorage`，不會進 repo）
+4. 選擇供應商：
+   - **xAI (Grok)**：`https://api.x.ai/v1`（預設 `grok-4.5`）
+   - **OpenAI**：`https://api.openai.com/v1`
+   - **Custom**：任何 OpenAI-compatible endpoint
+5. 描述後送出，例如：
+
+```text
+指標個案小明，男，30 歲。父親王大明、母親林美華已婚。小明有妹妹小華。
+```
+
+畫布會被 AI 結果**取代**（可 `Ctrl+Z` 復原）。  
+**安全**：純前端會把 key 帶在請求 Authorization 標頭；僅適合個人本機使用。
 
 ## 操作
 
@@ -66,3 +86,4 @@ npm run build
 | 重命名文件 | 工具列標題欄 |
 | 匯出 | 工具列「匯出」PNG / SVG / JSON |
 | 匯入 | 工具列「匯入」JSON |
+| AI 產生 | 底部 chatbox 描述家庭關係 → 自動產出家系圖 |

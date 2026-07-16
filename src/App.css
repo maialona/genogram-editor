@@ -1235,7 +1235,7 @@
   line-height: 1.4;
 }
 
-/* ── AI chatbox (bottom center, ChatGPT-style mock) ───── */
+/* ── AI chatbox (bottom center) ────────────────────────── */
 
 .ai-chatbox-dock {
   position: absolute;
@@ -1335,6 +1335,23 @@
 
 .ai-model-trigger svg {
   opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.ai-model-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-key-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fbbf24;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25);
 }
 
 .ai-chat-icon-btn {
@@ -1522,6 +1539,7 @@
   font-size: 13px;
   line-height: 1.45;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .ai-chat-bubble-user {
@@ -1583,6 +1601,159 @@
   .ai-chat-typing span {
     animation: none;
   }
+}
+
+/* ── AI settings modal ─────────────────────────────────── */
+
+.ai-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.ai-settings-modal {
+  width: min(420px, 100%);
+  max-height: min(90vh, 640px);
+  overflow-y: auto;
+  padding: 16px 18px 18px;
+  border-radius: 16px;
+  background: #202022;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  color: #ececee;
+}
+
+.ai-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ai-settings-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.ai-settings-hint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9b9ba3;
+}
+
+.ai-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #c4c4cc;
+}
+
+.ai-settings-field input,
+.ai-settings-field select {
+  appearance: none;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f4f5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  outline: none;
+}
+
+.ai-settings-field input:focus,
+.ai-settings-field select:focus {
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.ai-settings-field select {
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, #9b9ba3 50%),
+    linear-gradient(135deg, #9b9ba3 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 11px) calc(50% - 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+
+.ai-settings-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0 16px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #c4c4cc;
+  cursor: pointer;
+}
+
+.ai-settings-check input {
+  margin-top: 2px;
+  accent-color: #3b82f6;
+}
+
+.ai-settings-check code {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ai-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ai-settings-cancel,
+.ai-settings-save {
+  appearance: none;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.ai-settings-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e4e4e7;
+}
+
+.ai-settings-cancel:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ai-settings-save {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.ai-settings-save:hover {
+  background: #2563eb;
 }
 
 /* Raise toasts so they clear the chatbox */
