@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type {
   CulturalMark,
   Gender,
@@ -237,6 +238,17 @@ function itemActionHint(item: LibraryItem): string {
   return "套用至目前選取的人物（再點一次取消）";
 }
 
+/**
+ * Theme-aware monochrome ink.
+ * Use currentColor for stroke/ink so dark UI color on .symbol-icon always applies
+ * (SVG presentation attributes + CSS var() can fail and fall back to black).
+ */
+const SYM = {
+  stroke: "currentColor",
+  fill: "var(--sym-fill, #fff)",
+  ink: "currentColor",
+} as const;
+
 function MiniPerson({ gender }: { gender: Gender }) {
   const s = 22;
   const h = s / 2;
@@ -248,8 +260,8 @@ function MiniPerson({ gender }: { gender: Gender }) {
           y={-h}
           width={s}
           height={s}
-          fill="#fff"
-          stroke="#1a1a1a"
+          fill={SYM.fill}
+          stroke={SYM.stroke}
           strokeWidth={2}
         />
       </svg>
@@ -258,7 +270,7 @@ function MiniPerson({ gender }: { gender: Gender }) {
   if (gender === "female") {
     return (
       <svg width={28} height={28} viewBox="-14 -14 28 28">
-        <circle r={h} fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
+        <circle r={h} fill={SYM.fill} stroke={SYM.stroke} strokeWidth={2} />
       </svg>
     );
   }
@@ -266,8 +278,8 @@ function MiniPerson({ gender }: { gender: Gender }) {
     <svg width={28} height={28} viewBox="-14 -14 28 28">
       <path
         d={`M 0 ${-h} L ${h} 0 L 0 ${h} L ${-h} 0 Z`}
-        fill="#fff"
-        stroke="#1a1a1a"
+        fill={SYM.fill}
+        stroke={SYM.stroke}
         strokeWidth={2}
       />
     </svg>
@@ -276,7 +288,8 @@ function MiniPerson({ gender }: { gender: Gender }) {
 
 /** Mini preview icons — must visually match canvas RelationshipRenderer styles. */
 function MiniRel({ type }: { type: RelationshipType }) {
-  const BLACK = "#1a1a1a";
+  const BLACK = SYM.stroke;
+  const FILL = SYM.fill;
   const GREEN = "#16a34a";
   const RED = "#dc2626";
   const BLUE = "#2563eb";
@@ -471,7 +484,7 @@ function MiniRel({ type }: { type: RelationshipType }) {
     love: (
       <>
         <line x1={2} y1={10} x2={14} y2={10} stroke={GREEN} strokeWidth={2} />
-        <circle cx={18} cy={10} r={3} fill="#fff" stroke={GREEN} strokeWidth={2} />
+        <circle cx={18} cy={10} r={3} fill={FILL} stroke={GREEN} strokeWidth={2} />
         <line x1={22} y1={10} x2={34} y2={10} stroke={GREEN} strokeWidth={2} />
       </>
     ),
@@ -652,7 +665,7 @@ function MiniRel({ type }: { type: RelationshipType }) {
           y={5}
           width={10}
           height={10}
-          fill="#fff"
+          fill={FILL}
           stroke={RED}
           strokeWidth={1.5}
         />
@@ -673,7 +686,14 @@ function MiniRel({ type }: { type: RelationshipType }) {
     fanAdmire: (
       <>
         <line x1={2} y1={10} x2={13} y2={10} stroke={BLACK} strokeWidth={2} />
-        <circle cx={18} cy={10} r={3.5} fill="#fff" stroke={BLACK} strokeWidth={1.5} />
+        <circle
+          cx={18}
+          cy={10}
+          r={3.5}
+          fill={FILL}
+          stroke={BLACK}
+          strokeWidth={1.5}
+        />
         <line x1={22} y1={10} x2={27} y2={10} stroke={BLACK} strokeWidth={2} />
         <path d="M26 5 L34 10 L26 15 Z" fill={BLACK} />
       </>
@@ -698,12 +718,26 @@ function MiniStatus({ status }: { status: "deceased" | "indexPerson" }) {
           y={-10}
           width={20}
           height={20}
-          fill="#fff"
-          stroke="#1a1a1a"
+          fill={SYM.fill}
+          stroke={SYM.stroke}
           strokeWidth={2}
         />
-        <line x1={-7} y1={-7} x2={7} y2={7} stroke="#1a1a1a" strokeWidth={2} />
-        <line x1={7} y1={-7} x2={-7} y2={7} stroke="#1a1a1a" strokeWidth={2} />
+        <line
+          x1={-7}
+          y1={-7}
+          x2={7}
+          y2={7}
+          stroke={SYM.stroke}
+          strokeWidth={2}
+        />
+        <line
+          x1={7}
+          y1={-7}
+          x2={-7}
+          y2={7}
+          stroke={SYM.stroke}
+          strokeWidth={2}
+        />
       </svg>
     );
   }
@@ -715,7 +749,7 @@ function MiniStatus({ status }: { status: "deceased" | "indexPerson" }) {
         width={24}
         height={24}
         fill="none"
-        stroke="#1a1a1a"
+        stroke={SYM.stroke}
         strokeWidth={2}
       />
       <rect
@@ -723,8 +757,8 @@ function MiniStatus({ status }: { status: "deceased" | "indexPerson" }) {
         y={-8}
         width={16}
         height={16}
-        fill="#fff"
-        stroke="#1a1a1a"
+        fill={SYM.fill}
+        stroke={SYM.stroke}
         strokeWidth={2}
       />
     </svg>
@@ -736,19 +770,26 @@ function MiniAttr({ item }: { item: PersonAttrSymbol }) {
   if (a.field === "sexuality") {
     const dashed =
       a.value === "bisexualMale" || a.value === "bisexualFemale";
-    const isMale =
-      a.value === "gay" || a.value === "bisexualMale";
+    const isMale = a.value === "gay" || a.value === "bisexualMale";
     return (
       <svg width={28} height={28} viewBox="-14 -14 28 28">
         {isMale ? (
-          <rect x={-10} y={-10} width={20} height={20} fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
+          <rect
+            x={-10}
+            y={-10}
+            width={20}
+            height={20}
+            fill={SYM.fill}
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
         ) : (
-          <circle r={10} fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
+          <circle r={10} fill={SYM.fill} stroke={SYM.stroke} strokeWidth={2} />
         )}
         <path
           d="M0 6 L6 -4 L-6 -4 Z"
           fill="none"
-          stroke="#1a1a1a"
+          stroke={SYM.stroke}
           strokeWidth={1.5}
           strokeDasharray={dashed ? "2 1.5" : undefined}
         />
@@ -760,13 +801,29 @@ function MiniAttr({ item }: { item: PersonAttrSymbol }) {
       <svg width={28} height={28} viewBox="-14 -14 28 28">
         {a.value === "mtf" ? (
           <>
-            <rect x={-10} y={-10} width={20} height={20} fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
-            <circle r={6} fill="none" stroke="#1a1a1a" strokeWidth={1.5} />
+            <rect
+              x={-10}
+              y={-10}
+              width={20}
+              height={20}
+              fill={SYM.fill}
+              stroke={SYM.stroke}
+              strokeWidth={2}
+            />
+            <circle r={6} fill="none" stroke={SYM.stroke} strokeWidth={1.5} />
           </>
         ) : (
           <>
-            <circle r={10} fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
-            <rect x={-5} y={-5} width={10} height={10} fill="none" stroke="#1a1a1a" strokeWidth={1.5} />
+            <circle r={10} fill={SYM.fill} stroke={SYM.stroke} strokeWidth={2} />
+            <rect
+              x={-5}
+              y={-5}
+              width={10}
+              height={10}
+              fill="none"
+              stroke={SYM.stroke}
+              strokeWidth={1.5}
+            />
           </>
         )}
       </svg>
@@ -776,32 +833,76 @@ function MiniAttr({ item }: { item: PersonAttrSymbol }) {
     if (a.value === "pregnancy") {
       return (
         <svg width={28} height={28} viewBox="-14 -14 28 28">
-          <path d="M0 -10 L10 10 L-10 10 Z" fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
+          <path
+            d="M0 -10 L10 10 L-10 10 Z"
+            fill={SYM.fill}
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
         </svg>
       );
     }
     if (a.value === "pet") {
       return (
         <svg width={28} height={28} viewBox="-14 -14 28 28">
-          <path d="M0 -10 L10 0 L0 10 L-10 0 Z" fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
+          <path
+            d="M0 -10 L10 0 L0 10 L-10 0 Z"
+            fill={SYM.fill}
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
         </svg>
       );
     }
     if (a.value === "institution") {
       return (
         <svg width={28} height={28} viewBox="-14 -14 28 28">
-          <path d="M-8 0 L0 -10 L8 0" fill="none" stroke="#1a1a1a" strokeWidth={2} />
-          <rect x={-8} y={0} width={16} height={10} fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
+          <path
+            d="M-8 0 L0 -10 L8 0"
+            fill="none"
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
+          <rect
+            x={-8}
+            y={0}
+            width={16}
+            height={10}
+            fill={SYM.fill}
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
         </svg>
       );
     }
     if (a.value === "miscarriage" || a.value === "abortion") {
       return (
         <svg width={28} height={28} viewBox="-14 -14 28 28">
-          <line x1={-8} y1={-8} x2={8} y2={8} stroke="#1a1a1a" strokeWidth={2} />
-          <line x1={8} y1={-8} x2={-8} y2={8} stroke="#1a1a1a" strokeWidth={2} />
+          <line
+            x1={-8}
+            y1={-8}
+            x2={8}
+            y2={8}
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
+          <line
+            x1={8}
+            y1={-8}
+            x2={-8}
+            y2={8}
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
           {a.value === "abortion" && (
-            <line x1={-7} y1={0} x2={7} y2={0} stroke="#1a1a1a" strokeWidth={2} />
+            <line
+              x1={-7}
+              y1={0}
+              x2={7}
+              y2={0}
+              stroke={SYM.stroke}
+              strokeWidth={2}
+            />
           )}
         </svg>
       );
@@ -809,9 +910,28 @@ function MiniAttr({ item }: { item: PersonAttrSymbol }) {
     if (a.value === "stillbirth") {
       return (
         <svg width={28} height={28} viewBox="-14 -14 28 28">
-          <path d="M0 -10 L10 10 L-10 10 Z" fill="#fff" stroke="#1a1a1a" strokeWidth={2} />
-          <line x1={-5} y1={-2} x2={5} y2={6} stroke="#1a1a1a" strokeWidth={1.5} />
-          <line x1={5} y1={-2} x2={-5} y2={6} stroke="#1a1a1a" strokeWidth={1.5} />
+          <path
+            d="M0 -10 L10 10 L-10 10 Z"
+            fill={SYM.fill}
+            stroke={SYM.stroke}
+            strokeWidth={2}
+          />
+          <line
+            x1={-5}
+            y1={-2}
+            x2={5}
+            y2={6}
+            stroke={SYM.stroke}
+            strokeWidth={1.5}
+          />
+          <line
+            x1={5}
+            y1={-2}
+            x2={-5}
+            y2={6}
+            stroke={SYM.stroke}
+            strokeWidth={1.5}
+          />
         </svg>
       );
     }
@@ -819,7 +939,15 @@ function MiniAttr({ item }: { item: PersonAttrSymbol }) {
   if (a.field === "culturalMark") {
     return (
       <svg width={28} height={28} viewBox="-14 -14 28 28">
-        <rect x={-8} y={2} width={16} height={10} fill="#fff" stroke="#1a1a1a" strokeWidth={1.5} />
+        <rect
+          x={-8}
+          y={2}
+          width={16}
+          height={10}
+          fill={SYM.fill}
+          stroke={SYM.stroke}
+          strokeWidth={1.5}
+        />
         <path
           d={
             a.value === "multiCulture"
@@ -827,7 +955,7 @@ function MiniAttr({ item }: { item: PersonAttrSymbol }) {
               : "M0 2 L0 -6 C-5 -8 5 -10 -2 -12 C-5 -13 -4 -10 -2 -9"
           }
           fill="none"
-          stroke="#1a1a1a"
+          stroke={SYM.stroke}
           strokeWidth={1.5}
         />
       </svg>
@@ -840,27 +968,67 @@ function MiniMedical({ marker }: { marker: string }) {
   const def = MEDICAL_MARKERS.find((m) => m.id === marker);
   if (!def) return null;
   const color =
-    def.fill.kind === "solid" ? def.fill.color : def.fill.kind === "hatch" ? "#9ca3af" : "#fff";
+    def.fill.kind === "solid"
+      ? def.fill.color
+      : def.fill.kind === "hatch"
+        ? "var(--sym-hatch, #9ca3af)"
+        : SYM.fill;
   return (
     <svg width={28} height={28} viewBox="-14 -14 28 28">
-      <rect x={-10} y={-10} width={20} height={20} fill="#fff" stroke="#1a1a1a" strokeWidth={1.5} />
+      <rect
+        x={-10}
+        y={-10}
+        width={20}
+        height={20}
+        fill={SYM.fill}
+        stroke={SYM.stroke}
+        strokeWidth={1.5}
+      />
       {def.badge ? (
-        <text x={6} y={10} fontSize={10} fontWeight={700} fill="#1a1a1a">
+        <text x={6} y={10} fontSize={10} fontWeight={700} fill={SYM.ink}>
           {def.badge}
         </text>
       ) : def.region === "question" ? (
-        <text x={0} y={5} textAnchor="middle" fontSize={14} fontWeight={700} fill="#1a1a1a">
+        <text
+          x={0}
+          y={5}
+          textAnchor="middle"
+          fontSize={14}
+          fontWeight={700}
+          fill={SYM.ink}
+        >
           ?
         </text>
       ) : def.region === "centerDot" ? (
-        <circle r={4} fill="#4b5563" />
+        <circle r={4} fill="var(--sym-dot, #4b5563)" />
       ) : def.region === "cross" ? (
         <>
-          <line x1={0} y1={-10} x2={0} y2={10} stroke="#1a1a1a" strokeWidth={1.5} />
-          <line x1={-10} y1={0} x2={10} y2={0} stroke="#1a1a1a" strokeWidth={1.5} />
+          <line
+            x1={0}
+            y1={-10}
+            x2={0}
+            y2={10}
+            stroke={SYM.stroke}
+            strokeWidth={1.5}
+          />
+          <line
+            x1={-10}
+            y1={0}
+            x2={10}
+            y2={0}
+            stroke={SYM.stroke}
+            strokeWidth={1.5}
+          />
         </>
       ) : def.region === "verticalSplit" ? (
-        <line x1={0} y1={-10} x2={0} y2={10} stroke="#1a1a1a" strokeWidth={1.5} />
+        <line
+          x1={0}
+          y1={-10}
+          x2={0}
+          y2={10}
+          stroke={SYM.stroke}
+          strokeWidth={1.5}
+        />
       ) : (
         <rect
           x={def.region.includes("Right") ? 0 : -10}
@@ -1051,13 +1219,17 @@ export function SymbolLibrary() {
     const ariaLabel = pressed
       ? `${item.label}，已套用。${hint}`
       : `${item.label}。${hint}`;
+    const isDraggable = item.kind === "person";
 
     return (
       <button
         key={key}
         type="button"
-        className={`symbol-item${pressed ? " active" : ""}`}
-        draggable={item.kind === "person"}
+        className={`symbol-item${pressed ? " is-active" : ""}${
+          isDraggable ? " is-draggable" : ""
+        }`}
+        data-kind={item.kind}
+        draggable={isDraggable}
         onDragStart={(e) => onDragStart(e, item)}
         onClick={() => onClickItem(item)}
         title={hint}
@@ -1082,8 +1254,15 @@ export function SymbolLibrary() {
     const panelId = `symbol-section-${section.id}`;
     const open = openMap[section.id];
 
+    const lightIcons = section.id === "medicalColor";
+
     return (
-      <section className="symbol-section" key={section.id}>
+      <section
+        className={`symbol-section${open ? " is-open" : ""}${
+          lightIcons ? " is-light-icons" : ""
+        }`}
+        key={section.id}
+      >
         <h3 className="symbol-section-heading">
           <button
             type="button"
@@ -1093,7 +1272,7 @@ export function SymbolLibrary() {
             onClick={() => toggleSection(section.id)}
           >
             <span className="symbol-section-chevron" aria-hidden="true">
-              {open ? "▾" : "▸"}
+              <ChevronRight size={14} strokeWidth={2.25} />
             </span>
             <span className="symbol-section-title-text">{section.title}</span>
             <span className="symbol-section-count" aria-hidden="true">
@@ -1101,16 +1280,15 @@ export function SymbolLibrary() {
             </span>
           </button>
         </h3>
-        {open && (
-          <div
-            id={panelId}
-            className="symbol-grid"
-            role="group"
-            aria-label={section.title}
-          >
-            {section.items.map(renderItem)}
-          </div>
-        )}
+        <div
+          id={panelId}
+          className="symbol-section-panel"
+          role="group"
+          aria-label={section.title}
+          hidden={!open}
+        >
+          <div className="symbol-grid">{section.items.map(renderItem)}</div>
+        </div>
       </section>
     );
   };
@@ -1120,8 +1298,9 @@ export function SymbolLibrary() {
       className="float-panel symbol-library"
       aria-labelledby={headingId}
     >
-      <header className="panel-header">
+      <header className="panel-header symbol-library-header">
         <h2 id={headingId}>符號庫</h2>
+        <p className="symbol-library-sub">拖曳人物 · 點擊套用屬性</p>
       </header>
       <div className="symbol-library-body">
         {SECTIONS.map(renderSection)}

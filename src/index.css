@@ -35,7 +35,9 @@ textarea {
   font-family: inherit;
 }
 
-/* Remove default button styles for symbol items */
-button.symbol-item {
+/* Symbol library buttons inherit app font; strip UA chrome */
+button.symbol-item,
+button.symbol-section-toggle {
   font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
