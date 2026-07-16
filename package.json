@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "tsx --test tests/**/*.test.ts",
+    "test:layout": "tsx --test tests/ai/layoutGenogram.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
+    "tsx": "^4.20.6",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   }

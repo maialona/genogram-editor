@@ -4,6 +4,13 @@ import { PERSON_HALF } from "./constants";
 
 export { COUPLE_TYPES };
 
+export type ParentKind = "biological" | "adoptive";
+
+const PARENT_TYPES = new Set<Relationship["type"]>([
+  "parent",
+  "adoptiveParent",
+]);
+
 export interface FamilyUnit {
   /** Stable key for React. */
   id: string;
@@ -13,6 +20,8 @@ export interface FamilyUnit {
   children: Person[];
   /** Parent relationships belonging to this unit. */
   parentRels: Relationship[];
+  /** Manual twin links resolved to a shared group id. */
+  twinGroupByChild: ReadonlyMap<string, string>;
 }
 
 export interface FamilyUnitLayout {
@@ -31,7 +40,43 @@ export interface FamilyUnitLayout {
   /** Horizontal children bar. */
   childBar: { x1: number; x2: number; y: number } | null;
   /** Vertical drops onto each child. */
-  childDrops: { personId: string; x: number; y1: number; y2: number; relId: string }[];
+  childDrops: {
+    personId: string;
+    x: number;
+    y1: number;
+    y2: number;
+    relId: string;
+    parentKind: ParentKind;
+  }[];
+  /** Shared junctions and diagonal branches for twin groups. */
+  twinBranches: {
+    groupId: string;
+    junctionX: number;
+    junctionY: number;
+    y1: number;
+    relId: string;
+    parentKind: ParentKind;
+    children: {
+      personId: string;
+      x: number;
+      y2: number;
+      relId: string;
+      parentKind: ParentKind;
+    }[];
+  }[];
+}
+
+function parentKindForChild(
+  parentRels: Relationship[],
+  childId: string
+): ParentKind {
+  return parentRels.some(
+    (rel) =>
+      rel.to === childId &&
+      (rel.type === "adoptiveParent" || rel.meta?.parentKind === "adoptive")
+  )
+    ? "adoptive"
+    : "biological";
 }
 
 function personEdgeX(person: Person, towardX: number): number {
@@ -53,7 +98,25 @@ export function buildFamilyUnits(document: Document): {
   const units: FamilyUnit[] = [];
 
   const coupleRels = document.relationships.filter((r) => COUPLE_TYPES.has(r.type));
-  const parentRels = document.relationships.filter((r) => r.type === "parent");
+  const parentRels = document.relationships.filter((r) =>
+    PARENT_TYPES.has(r.type)
+  );
+  const twinRels = document.relationships.filter((r) => r.type === "twin");
+  const twinGroupByChild = new Map<string, string>();
+
+  for (const rel of twinRels) {
+    const fromGroup = twinGroupByChild.get(rel.from);
+    const toGroup = twinGroupByChild.get(rel.to);
+    const groupId = fromGroup ?? toGroup ?? `twin-${rel.id}`;
+    if (fromGroup && toGroup && fromGroup !== toGroup) {
+      for (const [personId, existingGroup] of twinGroupByChild) {
+        if (existingGroup === toGroup) twinGroupByChild.set(personId, fromGroup);
+      }
+    }
+    twinGroupByChild.set(rel.from, groupId);
+    twinGroupByChild.set(rel.to, groupId);
+    consumedRelIds.add(rel.id);
+  }
 
   /** childId → parent relationships */
   const parentsOf = new Map<string, Relationship[]>();
@@ -75,8 +138,11 @@ export function buildFamilyUnits(document: Document): {
     const unitParentRels: Relationship[] = [];
 
     for (const [childId, rels] of parentsOf) {
+      const childParentIds = new Set(rels.map((r) => r.from));
+      if (!Array.from(partnerIds).every((id) => childParentIds.has(id))) {
+        continue;
+      }
       const relevant = rels.filter((r) => partnerIds.has(r.from));
-      if (relevant.length === 0) continue;
       const child = personMap.get(childId);
       if (!child) continue;
       // Prefer assigning when child is below the couple (genogram convention)
@@ -100,6 +166,7 @@ export function buildFamilyUnits(document: Document): {
       coupleRel: couple,
       children,
       parentRels: unitParentRels,
+      twinGroupByChild,
     });
   }
 
@@ -138,6 +205,7 @@ export function buildFamilyUnits(document: Document): {
       coupleRel: null,
       children: entry.children,
       parentRels: entry.rels,
+      twinGroupByChild,
     });
   }
 
@@ -152,6 +220,73 @@ export function layoutFamilyUnit(unit: FamilyUnit): FamilyUnitLayout {
   let stem: FamilyUnitLayout["stem"] = null;
   let childBar: FamilyUnitLayout["childBar"] = null;
   const childDrops: FamilyUnitLayout["childDrops"] = [];
+  const twinBranches: FamilyUnitLayout["twinBranches"] = [];
+
+  const appendChildConnections = (barY: number, fallbackRelId: string) => {
+    const groupedTwins = new Map<string, Person[]>();
+    for (const child of children) {
+      const groupId =
+        (typeof child.meta?.twinGroup === "string"
+          ? child.meta.twinGroup
+          : undefined) ?? unit.twinGroupByChild.get(child.id);
+      if (typeof groupId !== "string" || !groupId) continue;
+      const group = groupedTwins.get(groupId) ?? [];
+      group.push(child);
+      groupedTwins.set(groupId, group);
+    }
+
+    const twinChildIds = new Set<string>();
+    for (const [groupId, group] of groupedTwins) {
+      if (group.length < 2) continue;
+      group.sort((a, b) => a.x - b.x);
+      group.forEach((child) => twinChildIds.add(child.id));
+      const junctionX =
+        group.reduce((sum, child) => sum + child.x, 0) / group.length;
+      const minChildTop = Math.min(
+        ...group.map((child) => child.y - PERSON_HALF)
+      );
+      const junctionY = Math.max(barY + 12, minChildTop - 20);
+      const childrenBranches = group.map((child) => {
+        const rel =
+          parentRels.find((item) => item.to === child.id) ?? parentRels[0];
+        return {
+          personId: child.id,
+          x: child.x,
+          y2: child.y - PERSON_HALF,
+          relId: rel?.id ?? fallbackRelId,
+          parentKind: parentKindForChild(parentRels, child.id),
+        };
+      });
+      const parentKind = childrenBranches.every(
+        (branch) => branch.parentKind === "adoptive"
+      )
+        ? "adoptive"
+        : "biological";
+      twinBranches.push({
+        groupId,
+        junctionX,
+        junctionY,
+        y1: barY,
+        relId: childrenBranches[0]?.relId ?? fallbackRelId,
+        parentKind,
+        children: childrenBranches,
+      });
+    }
+
+    for (const child of children) {
+      if (twinChildIds.has(child.id)) continue;
+      const rel =
+        parentRels.find((item) => item.to === child.id) ?? parentRels[0];
+      childDrops.push({
+        personId: child.id,
+        x: child.x,
+        y1: barY,
+        y2: child.y - PERSON_HALF,
+        relId: rel?.id ?? fallbackRelId,
+        parentKind: parentKindForChild(parentRels, child.id),
+      });
+    }
+  };
 
   if (partnerB) {
     // Horizontal couple bar between partners (classic genogram)
@@ -176,17 +311,7 @@ export function layoutFamilyUnit(unit: FamilyUnit): FamilyUnitLayout {
       const spanX2 = Math.max(midX, barX2);
       childBar = { x1: spanX1, x2: spanX2, y: barY };
 
-      for (const child of children) {
-        const rel =
-          parentRels.find((r) => r.to === child.id) ?? parentRels[0];
-        childDrops.push({
-          personId: child.id,
-          x: child.x,
-          y1: barY,
-          y2: child.y - PERSON_HALF,
-          relId: rel?.id ?? coupleRel?.id ?? unit.id,
-        });
-      }
+      appendChildConnections(barY, coupleRel?.id ?? unit.id);
     }
   } else {
     // Single parent: drop from bottom of parent symbol
@@ -206,18 +331,9 @@ export function layoutFamilyUnit(unit: FamilyUnit): FamilyUnitLayout {
       stem = { x: parent.x, y1: originY, y2: barY };
       childBar = { x1: barX1, x2: barX2, y: barY };
 
-      for (const child of children) {
-        const rel = parentRels.find((r) => r.to === child.id) ?? parentRels[0];
-        childDrops.push({
-          personId: child.id,
-          x: child.x,
-          y1: barY,
-          y2: child.y - PERSON_HALF,
-          relId: rel?.id ?? unit.id,
-        });
-      }
+      appendChildConnections(barY, unit.id);
     }
   }
 
-  return { unit, couple, stem, childBar, childDrops };
+  return { unit, couple, stem, childBar, childDrops, twinBranches };
 }

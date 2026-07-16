@@ -10,6 +10,7 @@ import type {
 } from "../types/document";
 import {
   EMOTION_REL_OPTIONS,
+  FAMILY_REL_LEGEND,
   FAMILY_REL_OPTIONS,
 } from "../types/relationshipCatalog";
 import { MEDICAL_MARKERS } from "../types/medicalCatalog";
@@ -286,6 +287,37 @@ function MiniPerson({ gender }: { gender: Gender }) {
   );
 }
 
+function LegendMark({ kind }: { kind: (typeof FAMILY_REL_LEGEND)[number]["key"] }) {
+  if (kind === "biological") {
+    return (
+      <svg viewBox="0 0 36 18" aria-hidden="true">
+        <line x1={18} y1={1} x2={18} y2={17} />
+      </svg>
+    );
+  }
+  if (kind === "adoptive") {
+    return (
+      <svg viewBox="0 0 36 18" aria-hidden="true">
+        <line x1={15} y1={1} x2={15} y2={17} />
+        <line
+          x1={21}
+          y1={1}
+          x2={21}
+          y2={17}
+          strokeDasharray="3 2"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 36 18" aria-hidden="true">
+      <line x1={18} y1={1} x2={18} y2={7} />
+      <line x1={18} y1={7} x2={8} y2={17} />
+      <line x1={18} y1={7} x2={28} y2={17} />
+    </svg>
+  );
+}
+
 /** Mini preview icons — must visually match canvas RelationshipRenderer styles. */
 function MiniRel({ type }: { type: RelationshipType }) {
   const BLACK = SYM.stroke;
@@ -466,6 +498,27 @@ function MiniRel({ type }: { type: RelationshipType }) {
       <>
         <line x1={18} y1={2} x2={18} y2={18} stroke={BLACK} strokeWidth={2} />
         <line x1={10} y1={18} x2={26} y2={18} stroke={BLACK} strokeWidth={2} />
+      </>
+    ),
+    adoptiveParent: (
+      <>
+        <line x1={16} y1={2} x2={16} y2={18} stroke={BLACK} strokeWidth={2} />
+        <line
+          x1={21}
+          y1={2}
+          x2={21}
+          y2={18}
+          stroke={BLACK}
+          strokeWidth={1.5}
+          strokeDasharray="3 2"
+        />
+      </>
+    ),
+    twin: (
+      <>
+        <line x1={18} y1={2} x2={18} y2={8} stroke={BLACK} strokeWidth={2} />
+        <line x1={18} y1={8} x2={9} y2={18} stroke={BLACK} strokeWidth={2} />
+        <line x1={18} y1={8} x2={27} y2={18} stroke={BLACK} strokeWidth={2} />
       </>
     ),
     // ── Emotional (match canvas) ──────────────────────────
@@ -1288,6 +1341,22 @@ export function SymbolLibrary() {
           hidden={!open}
         >
           <div className="symbol-grid">{section.items.map(renderItem)}</div>
+          {section.id === "family" && (
+            <div className="family-rel-legend" role="note" aria-label="家庭關係圖例">
+              <span className="family-rel-legend-title">圖例</span>
+              {FAMILY_REL_LEGEND.map((item) => (
+                <span className="family-rel-legend-item" key={item.key}>
+                  <span className="family-rel-legend-mark">
+                    <LegendMark kind={item.key} />
+                  </span>
+                  <span>
+                    {item.label}
+                    <small>{item.detail}</small>
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     );
@@ -1300,7 +1369,7 @@ export function SymbolLibrary() {
     >
       <header className="panel-header symbol-library-header">
         <h2 id={headingId}>符號庫</h2>
-        <p className="symbol-library-sub">拖曳人物 · 點擊套用屬性</p>
+        <p className="symbol-library-sub">拖曳人物 · 點擊關係後選擇兩人</p>
       </header>
       <div className="symbol-library-body">
         {SECTIONS.map(renderSection)}

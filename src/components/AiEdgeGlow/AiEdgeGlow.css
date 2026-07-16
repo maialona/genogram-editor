@@ -1,0 +1,151 @@
+.ai-edge-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow: hidden;
+  border-radius: 30px;
+  pointer-events: none;
+  opacity: 0;
+  isolation: isolate;
+  contain: strict;
+  transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-edge-glow.is-active {
+  opacity: 1;
+}
+
+.ai-edge-glow-canvas,
+.ai-edge-glow-fallback {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ai-edge-glow-canvas {
+  mix-blend-mode: normal;
+  filter: saturate(1.08);
+}
+
+.ai-edge-glow-fallback {
+  display: none;
+  overflow: hidden;
+}
+
+.ai-edge-glow.is-fallback .ai-edge-glow-canvas {
+  opacity: 0;
+}
+
+.ai-edge-glow.is-fallback .ai-edge-glow-fallback {
+  display: block;
+}
+
+.ai-edge-glow-blob {
+  position: absolute;
+  left: var(--edge-glow-x);
+  top: var(--edge-glow-y);
+  width: var(--edge-glow-width);
+  height: var(--edge-glow-height);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation:
+    ai-edge-glow-blob-drift var(--edge-glow-duration) ease-in-out infinite
+      alternate var(--edge-glow-delay),
+    ai-edge-glow-blob-breathe calc(var(--edge-glow-duration) * 0.79)
+      ease-in-out infinite var(--edge-glow-delay);
+  will-change: transform, opacity;
+}
+
+.ai-edge-glow-blob > span {
+  position: absolute;
+  display: block;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.ai-edge-glow-blob-atmosphere {
+  inset: -14%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in oklab, var(--edge-glow-color) 48%, transparent) 0%,
+    color-mix(in oklab, var(--edge-glow-color) 24%, transparent) 38%,
+    transparent 76%
+  );
+  filter: blur(var(--edge-glow-blur)) saturate(1.2);
+}
+
+.ai-edge-glow-blob-bloom {
+  inset: 12%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in oklab, var(--edge-glow-color) 78%, transparent) 0%,
+    color-mix(in oklab, var(--edge-glow-color) 38%, transparent) 42%,
+    transparent 74%
+  );
+  filter: blur(calc(var(--edge-glow-blur) * 0.45)) saturate(1.3);
+}
+
+.ai-edge-glow-blob-core {
+  inset: 36%;
+  background: var(--edge-glow-color);
+  box-shadow: 0 0 4px var(--edge-glow-color);
+  filter: blur(1.5px);
+}
+
+@keyframes ai-edge-glow-blob-drift {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) scale(0.94);
+  }
+  47% {
+    transform: translate(-50%, -50%)
+      translate(
+        calc(var(--edge-glow-drift-x) * 0.46),
+        calc(var(--edge-glow-drift-y) * 0.58)
+      )
+      scale(1.02);
+  }
+  100% {
+    transform: translate(-50%, -50%)
+      translate(var(--edge-glow-drift-x), var(--edge-glow-drift-y))
+      scale(0.98);
+  }
+}
+
+@keyframes ai-edge-glow-blob-breathe {
+  0%,
+  100% {
+    opacity: calc(var(--edge-glow-intensity) * 0.08);
+  }
+  38% {
+    opacity: calc(var(--edge-glow-intensity) * 0.72);
+  }
+  67% {
+    opacity: calc(var(--edge-glow-intensity) * 0.2);
+  }
+}
+
+@media (max-width: 640px) {
+  .ai-edge-glow {
+    border-radius: 24px;
+  }
+
+  .ai-edge-glow-blob {
+    width: calc(var(--edge-glow-width) * 0.7);
+    height: calc(var(--edge-glow-height) * 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-edge-glow {
+    transition: none;
+  }
+
+  .ai-edge-glow-blob {
+    animation: none;
+    opacity: var(--edge-glow-static-intensity);
+  }
+}

@@ -23,12 +23,16 @@ export interface AiPersonDraft {
   deceased?: boolean;
   indexPerson?: boolean;
   notes?: string;
+  /** Shared id for siblings that should render from one twin junction. */
+  twinGroup?: string;
 }
 
 export interface AiRelationshipDraft {
   from: string;
   to: string;
   type: RelationshipType;
+  /** Applies to parent relationships; omitted means biological. */
+  parentKind?: "biological" | "adoptive";
 }
 
 /** Structured payload expected from the model (no pixel coordinates). */
@@ -48,6 +52,7 @@ export interface AiGenerateResult {
 export class AiClientError extends Error {
   readonly code:
     | "no_key"
+    | "invalid_key"
     | "http"
     | "network"
     | "parse"

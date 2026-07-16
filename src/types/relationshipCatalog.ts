@@ -28,6 +28,8 @@ export const RELATIONSHIP_LABELS: Record<RelationshipType, string> = {
   engagementSeparation: "訂婚分居",
   loveAffair: "婚外情",
   parent: "親子",
+  adoptiveParent: "收養親子",
+  twin: "雙胞胎",
   harmony: "和諧",
   indifferent: "冷漠",
   love: "愛",
@@ -66,6 +68,8 @@ export const FAMILY_REL_OPTIONS: { value: RelationshipType; label: string }[] = 
   { value: "legalCohabitation", label: "法律同居" },
   { value: "loveAffair", label: "婚外情" },
   { value: "parent", label: "親子" },
+  { value: "adoptiveParent", label: "收養親子" },
+  { value: "twin", label: "雙胞胎" },
 ];
 
 export const EMOTION_REL_OPTIONS: { value: RelationshipType; label: string }[] =
@@ -99,3 +103,9 @@ export const ALL_REL_OPTIONS: { value: RelationshipType; label: string }[] = [
   ...FAMILY_REL_OPTIONS,
   ...EMOTION_REL_OPTIONS,
 ];
+
+export const FAMILY_REL_LEGEND = [
+  { key: "biological", label: "親生", detail: "單實線" },
+  { key: "adoptive", label: "收養", detail: "實線＋平行虛線" },
+  { key: "twin", label: "雙胞胎", detail: "共用分岔" },
+] as const;

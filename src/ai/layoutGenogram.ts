@@ -122,6 +122,79 @@ function orderGeneration(
 }
 
 /**
+ * Keep couple blocks intact while enforcing a minimum gap between every
+ * person in a generation. The row is recentered after collision resolution
+ * so its overall alignment remains stable.
+ */
+function resolveGenerationCollisions(
+  personIds: string[],
+  draft: AiGenogramDraft,
+  partners: Map<string, string>,
+  positions: Map<string, { x: number; y: number }>
+): void {
+  if (personIds.length < 2) return;
+
+  const originalXs = personIds
+    .map((id) => positions.get(id)?.x)
+    .filter((x): x is number => typeof x === "number");
+  if (originalXs.length !== personIds.length) return;
+
+  const remaining = new Set(personIds);
+  const orderedIds = [...personIds].sort(
+    (a, b) => (positions.get(a)?.x ?? 0) - (positions.get(b)?.x ?? 0)
+  );
+  const blocks: Array<{ ids: string[]; desiredCenter: number }> = [];
+
+  for (const id of orderedIds) {
+    if (!remaining.has(id)) continue;
+    remaining.delete(id);
+
+    const partner = partners.get(id);
+    const blockIds =
+      partner && remaining.has(partner)
+        ? orderGeneration([id, partner], draft, partners)
+        : [id];
+    if (partner) remaining.delete(partner);
+
+    const xs = blockIds.map((memberId) => positions.get(memberId)?.x ?? 0);
+    blocks.push({
+      ids: blockIds,
+      desiredCenter: xs.reduce((sum, x) => sum + x, 0) / xs.length,
+    });
+  }
+
+  blocks.sort((a, b) => a.desiredCenter - b.desiredCenter);
+
+  const placedXs = new Map<string, number>();
+  let previousRight: number | null = null;
+  for (const block of blocks) {
+    const width = Math.max(0, block.ids.length - 1) * DX;
+    const minCenter =
+      previousRight == null ? block.desiredCenter : previousRight + DX + width / 2;
+    const center = Math.max(block.desiredCenter, minCenter);
+    const startX = center - width / 2;
+    block.ids.forEach((id, index) => {
+      placedXs.set(id, startX + index * DX);
+    });
+    previousRight = center + width / 2;
+  }
+
+  const originalCenter =
+    originalXs.reduce((sum, x) => sum + x, 0) / originalXs.length;
+  const placedValues = Array.from(placedXs.values());
+  const placedCenter =
+    placedValues.reduce((sum, x) => sum + x, 0) / placedValues.length;
+  const recenterBy = originalCenter - placedCenter;
+
+  for (const id of personIds) {
+    const pos = positions.get(id);
+    const x = placedXs.get(id);
+    if (!pos || x == null) continue;
+    positions.set(id, { x: x + recenterBy, y: pos.y });
+  }
+}
+
+/**
  * Convert AI structural draft into a full Document with laid-out coordinates.
  */
 export function layoutGenogram(draft: AiGenogramDraft): Document {
@@ -206,6 +279,8 @@ export function layoutGenogram(draft: AiGenogramDraft): Document {
         positions.set(cid, { x: start + i * DX, y: pos.y });
       });
     }
+
+    resolveGenerationCollisions(ids, draft, partners, positions);
   }
 
   const idMap = new Map<string, string>();
@@ -231,6 +306,7 @@ export function layoutGenogram(draft: AiGenogramDraft): Document {
       deceased: Boolean(p.deceased),
       indexPerson: Boolean(p.indexPerson),
       notes: notesParts.join(" · "),
+      meta: p.twinGroup ? { twinGroup: p.twinGroup } : undefined,
     });
   });
 
@@ -252,6 +328,10 @@ export function layoutGenogram(draft: AiGenogramDraft): Document {
         from,
         to,
         type: r.type,
+        meta:
+          r.type === "parent" && r.parentKind
+            ? { parentKind: r.parentKind }
+            : undefined,
       })
     );
   }

@@ -32,6 +32,12 @@ export async function generateGenogramDraft(
   if (!apiKey) {
     throw new AiClientError("no_key", "請先在設定中輸入 API Key");
   }
+  if (!/^[\x00-\x7F]+$/.test(apiKey)) {
+    throw new AiClientError(
+      "invalid_key",
+      "API Key 含有無效字元，請重新貼上供應商提供的 API Key"
+    );
+  }
 
   const text = description.trim();
   if (!text) {

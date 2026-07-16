@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useDocumentStore } from "../store/documentStore";
+import { useAiGenerationStore } from "../store/aiGenerationStore";
 
 /**
  * True only when the event target is actively editing text.
@@ -59,6 +60,7 @@ function isModKey(e: KeyboardEvent, letter: string): boolean {
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (useAiGenerationStore.getState().isGenerating()) return;
       // Only skip during active IME composition (NOT keyCode 229 — that breaks
       // Delete/Backspace on Chinese Windows IMEs even when not composing).
       if (e.isComposing) return;

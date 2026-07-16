@@ -134,7 +134,7 @@ function renderByType(type: RelationshipType, ctx: DrawCtx): React.ReactNode {
     );
   }
 
-  if (type === "parent") {
+  if (type === "parent" || type === "adoptiveParent") {
     const x1 = from.x;
     const y1 = from.y + PERSON_HALF;
     const x2 = to.x;

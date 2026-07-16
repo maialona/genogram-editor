@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Gender } from "../../types/document";
 import { RELATIONSHIP_LABELS } from "../../types/relationshipCatalog";
 import { useDocumentStore } from "../../store/documentStore";
-import { createSampleGenogram } from "../../data/sampleGenogram";
-import { showToast } from "../../store/toastStore";
 import { SvgRenderer } from "../../renderers/SvgRenderer";
 import { Grid } from "../../renderers/Grid";
 import { PERSON_HALF } from "../../renderers/constants";
+import { useAiGenerationStore } from "../../store/aiGenerationStore";
+import { AiConstellationOverlay } from "./AiConstellationOverlay";
 
 const MIN_SCALE = 0.15;
 const MAX_SCALE = 4;
@@ -113,6 +113,8 @@ export function Canvas() {
   const interactionMode = useDocumentStore((s) => s.interactionMode);
   const connectFromId = useDocumentStore((s) => s.connectFromId);
   const pendingRelationshipType = useDocumentStore((s) => s.pendingRelationshipType);
+  const generationPhase = useAiGenerationStore((s) => s.phase);
+  const previewDocument = useAiGenerationStore((s) => s.previewDocument);
 
   const setViewport = useDocumentStore((s) => s.setViewport);
   const setCanvasSize = useDocumentStore((s) => s.setCanvasSize);
@@ -126,8 +128,6 @@ export function Canvas() {
   const addRelationship = useDocumentStore((s) => s.addRelationship);
   const setConnectFromId = useDocumentStore((s) => s.setConnectFromId);
   const setInteractionMode = useDocumentStore((s) => s.setInteractionMode);
-  const loadDocumentData = useDocumentStore((s) => s.loadDocumentData);
-  const requestFitToContent = useDocumentStore((s) => s.requestFitToContent);
 
   const { viewport } = document;
 
@@ -660,6 +660,9 @@ export function Canvas() {
       style={{ cursor }}
       tabIndex={0}
       aria-label="家系圖畫布"
+      aria-busy={
+        generationPhase !== "idle" && generationPhase !== "error"
+      }
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -733,35 +736,12 @@ export function Canvas() {
         )}
       </svg>
 
-      {document.persons.length === 0 && (
-        <div className="canvas-empty" role="status">
-          <div className="canvas-empty-card">
-            <h2 className="canvas-empty-title">開始建立家系圖</h2>
-            <p className="canvas-empty-body">
-              從左側符號庫拖曳「男性／女性」到畫布，再點「婚姻」或「親子」連線。
-            </p>
-            <div className="canvas-empty-actions">
-              <button
-                type="button"
-                className="canvas-empty-primary"
-                onClick={() => {
-                  loadDocumentData(createSampleGenogram());
-                  requestFitToContent();
-                  showToast("已載入示範家系圖", {
-                    tone: "success",
-                    durationMs: 2500,
-                  });
-                }}
-              >
-                載入示範
-              </button>
-            </div>
-            <p className="canvas-empty-foot">
-              完成後可從工具列「匯出」下載 PNG / SVG / JSON
-            </p>
-          </div>
-        </div>
-      )}
+      <AiConstellationOverlay
+        phase={generationPhase}
+        previewDocument={previewDocument}
+        width={size.width}
+        height={size.height}
+      />
 
       {(interactionMode === "connect" || drag.type === "connect-drag") && (
         <div className="canvas-hint">

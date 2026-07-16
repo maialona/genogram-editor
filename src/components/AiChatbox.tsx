@@ -1,29 +1,73 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowUp,
-  Mic,
-  Settings,
-  Sparkles,
-  X,
-} from "lucide-react";
-import { generateGenogramDraft } from "../ai/client";
-import { layoutGenogram } from "../ai/layoutGenogram";
+import { ArrowUp, Mic, Settings, Sparkles, Square, X } from "lucide-react";
+import { runAiGeneration } from "../ai/runAiGeneration";
 import { getAiSettingsSnapshot, useAiSettingsStore } from "../ai/settingsStore";
 import { AiClientError } from "../ai/types";
+import {
+  type AiGenerationPhase,
+  useAiGenerationStore,
+} from "../store/aiGenerationStore";
 import { useDocumentStore } from "../store/documentStore";
 import { showToast } from "../store/toastStore";
+import { getAiChatboxClassName } from "./aiChatboxClassName";
 import { AiSettingsModal } from "./AiSettingsModal";
-
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
 
 const ICON = {
   size: 16,
   strokeWidth: 1.75,
 } as const;
+
+const PHASE_LABELS: Partial<Record<AiGenerationPhase, string>> = {
+  analyzing: "理解描述",
+  structuring: "整理人物",
+  linking: "建立關係",
+  revealing: "生成家系圖",
+};
+
+export function AiGenerationStatus({
+  phase,
+  error,
+  onDismissError,
+}: {
+  phase: AiGenerationPhase;
+  error: string | null;
+  onDismissError: () => void;
+}) {
+  const busy =
+    phase === "analyzing" ||
+    phase === "structuring" ||
+    phase === "linking" ||
+    phase === "revealing";
+
+  if (busy) {
+    return (
+      <div className="ai-generation-chip" role="status" aria-live="polite">
+        <Sparkles size={13} strokeWidth={1.8} aria-hidden />
+        <span>{PHASE_LABELS[phase]}</span>
+        <span className="ai-generation-pulse" aria-hidden />
+      </div>
+    );
+  }
+
+  if (phase === "error" && error) {
+    return (
+      <div className="ai-generation-chip is-error" role="alert">
+        <span>{error}</span>
+        <button type="button" onClick={onDismissError} aria-label="關閉錯誤訊息">
+          <X size={13} strokeWidth={2} />
+        </button>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function createRunId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export function AiChatbox() {
   const model = useAiSettingsStore((s) => s.model);
@@ -33,43 +77,51 @@ export function AiChatbox() {
   const requestFitToContent = useDocumentStore((s) => s.requestFitToContent);
   const hasContent = useDocumentStore((s) => s.hasContent);
 
+  const phase = useAiGenerationStore((s) => s.phase);
+  const error = useAiGenerationStore((s) => s.error);
+  const begin = useAiGenerationStore((s) => s.begin);
+  const setPhase = useAiGenerationStore((s) => s.setPhase);
+  const setPreview = useAiGenerationStore((s) => s.setPreview);
+  const fail = useAiGenerationStore((s) => s.fail);
+  const cancel = useAiGenerationStore((s) => s.cancel);
+  const complete = useAiGenerationStore((s) => s.complete);
+  const clearError = useAiGenerationStore((s) => s.clearError);
+
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const submittedTextRef = useRef("");
 
+  const busy =
+    phase === "analyzing" ||
+    phase === "structuring" ||
+    phase === "linking" ||
+    phase === "revealing";
   const canSend = input.trim().length > 0 && !busy;
-
-  useEffect(() => {
-    if (!panelOpen || !listRef.current) return;
-    listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [messages, panelOpen, busy]);
 
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      const runId = useAiGenerationStore.getState().runId;
+      if (runId) useAiGenerationStore.getState().cancel(runId);
     };
   }, []);
 
-  const appendMessage = (role: ChatMessage["role"], content: string) => {
-    const msg: ChatMessage = {
-      id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      role,
-      content,
-    };
-    setMessages((prev) => [...prev, msg]);
-    setPanelOpen(true);
-    return msg;
+  const cancelGeneration = () => {
+    const runId = useAiGenerationStore.getState().runId;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setInput(submittedTextRef.current);
+    cancel(runId ?? undefined);
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;
+    if (phase === "error") clearError();
 
     if (!keyReady) {
       setSettingsOpen(true);
@@ -84,119 +136,93 @@ export function AiChatbox() {
       if (!ok) return;
     }
 
-    setInput("");
-    appendMessage("user", text);
-    setBusy(true);
-
+    const runId = createRunId();
     const controller = new AbortController();
     abortRef.current = controller;
+    submittedTextRef.current = text;
+    setInput("");
+    begin(runId);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
 
     try {
-      const settings = getAiSettingsSnapshot();
-      const { draft, warnings } = await generateGenogramDraft(
-        text,
-        settings,
-        controller.signal
-      );
-      const doc = layoutGenogram(draft);
-      loadDocumentData(doc);
-      // Fit after layout paints / canvas size known
-      requestAnimationFrame(() => {
-        requestFitToContent();
-      });
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      await runAiGeneration({
+        description: text,
+        settings: getAiSettingsSnapshot(),
+        signal: controller.signal,
+        timings: reduceMotion ? { revealMs: 0 } : undefined,
+        onPhase: (nextPhase) => setPhase(runId, nextPhase),
+        onPreview: (previewDocument) => setPreview(runId, previewDocument),
+        onCommit: (nextDocument, result) => {
+          if (useAiGenerationStore.getState().runId !== runId) return;
+          loadDocumentData(nextDocument);
+          complete(runId);
+          requestAnimationFrame(() => requestFitToContent());
 
-      const n = doc.persons.length;
-      const m = doc.relationships.length;
-      const summary =
-        draft.summary?.trim() ||
-        `已根據描述產生家系圖：${n} 人、${m} 條關係。`;
-      const warnText =
-        warnings.length > 0
-          ? `\n\n注意：${warnings.slice(0, 4).join("；")}`
-          : "";
-      appendMessage(
-        "assistant",
-        `${summary}${warnText}\n\n可在畫布上繼續編輯；Ctrl+Z 可還原上一版。`
-      );
-      showToast(`已產生 ${n} 人 · ${m} 條關係`, {
-        tone: "success",
-        durationMs: 3200,
+          const n = nextDocument.persons.length;
+          const m = nextDocument.relationships.length;
+          showToast(`已產生 ${n} 人 · ${m} 條關係`, {
+            tone: "success",
+            durationMs: 3200,
+          });
+          if (result.warnings.length > 0) {
+            const shown = result.warnings.slice(0, 2).join("；");
+            const more = Math.max(0, result.warnings.length - 2);
+            showToast(`注意：${shown}${more > 0 ? `；另有 ${more} 項` : ""}`, {
+              tone: "info",
+              durationMs: 7000,
+            });
+          }
+        },
       });
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        return;
-      }
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      if (useAiGenerationStore.getState().runId !== runId) return;
+
       const message =
         err instanceof AiClientError
           ? err.message
           : err instanceof Error
             ? err.message
             : "產生家系圖時發生未知錯誤";
-      appendMessage("assistant", `無法產生家系圖：${message}`);
-      showToast(message, { tone: "error", durationMs: 5000 });
-      if (err instanceof AiClientError && err.code === "no_key") {
+      setInput(submittedTextRef.current);
+      fail(runId, message);
+      if (
+        err instanceof AiClientError &&
+        (err.code === "no_key" || err.code === "invalid_key")
+      ) {
         setSettingsOpen(true);
       }
     } finally {
-      setBusy(false);
-      abortRef.current = null;
+      if (abortRef.current === controller) abortRef.current = null;
     }
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
+  const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
       void send();
     }
   };
 
-  const clearChat = () => {
-    abortRef.current?.abort();
-    setMessages([]);
-    setPanelOpen(false);
-    setBusy(false);
+  const onInputChange = (value: string) => {
+    if (phase === "error") clearError();
+    setInput(value);
   };
 
   return (
     <div className="ai-chatbox-dock" aria-label="AI 家系圖產生">
-      {panelOpen && messages.length > 0 && (
-        <div className="ai-chat-panel" role="log" aria-live="polite">
-          <div className="ai-chat-panel-head">
-            <div className="ai-chat-panel-title">
-              <Sparkles size={14} strokeWidth={1.75} aria-hidden />
-              <span>AI 助手</span>
-            </div>
-            <button
-              type="button"
-              className="ai-chat-icon-btn"
-              onClick={clearChat}
-              title="關閉對話"
-              aria-label="關閉對話"
-            >
-              <X size={16} strokeWidth={1.75} />
-            </button>
-          </div>
-          <div className="ai-chat-messages" ref={listRef}>
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`ai-chat-bubble ai-chat-bubble-${m.role}`}
-              >
-                {m.content}
-              </div>
-            ))}
-            {busy && (
-              <div className="ai-chat-bubble ai-chat-bubble-assistant ai-chat-typing">
-                <span />
-                <span />
-                <span />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <AiGenerationStatus
+        phase={phase}
+        error={error}
+        onDismissError={clearError}
+      />
 
-      <div className="ai-chatbox">
+      <div className={getAiChatboxClassName(busy)}>
         <label className="sr-only" htmlFor="ai-chat-input">
           描述個案家庭關係
         </label>
@@ -206,9 +232,9 @@ export function AiChatbox() {
           className="ai-chatbox-input"
           rows={1}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="描述個案家庭關係，AI 將產生家系圖…"
+          placeholder={busy ? "AI 正在建立家系圖…" : "描述個案家庭關係，AI 將產生家系圖…"}
           disabled={busy}
         />
 
@@ -220,12 +246,11 @@ export function AiChatbox() {
               onClick={() => setSettingsOpen(true)}
               title="AI 設定"
               aria-label="開啟 AI 設定"
+              disabled={busy}
             >
               <Settings size={14} strokeWidth={2} aria-hidden />
               <span className="ai-model-label">{model || "設定模型"}</span>
-              {!keyReady && (
-                <span className="ai-key-dot" title="尚未設定 API Key" />
-              )}
+              {!keyReady && <span className="ai-key-dot" title="尚未設定 API Key" />}
             </button>
           </div>
 
@@ -241,13 +266,17 @@ export function AiChatbox() {
             </button>
             <button
               type="button"
-              className={`ai-send-btn${canSend ? " ready" : ""}`}
-              title="產生家系圖"
-              aria-label="產生家系圖"
-              disabled={!canSend}
-              onClick={() => void send()}
+              className={`ai-send-btn${busy ? " cancel" : canSend ? " ready" : ""}`}
+              title={busy ? "停止產生" : "產生家系圖"}
+              aria-label={busy ? "停止產生" : "產生家系圖"}
+              disabled={!busy && !canSend}
+              onClick={busy ? cancelGeneration : () => void send()}
             >
-              <ArrowUp size={18} strokeWidth={2.25} />
+              {busy ? (
+                <Square size={13} fill="currentColor" strokeWidth={1.5} />
+              ) : (
+                <ArrowUp size={18} strokeWidth={2.25} />
+              )}
             </button>
           </div>
         </div>

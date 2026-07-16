@@ -25,24 +25,32 @@ export function buildSystemPrompt(): string {
       "deathYear": null,
       "deceased": false,
       "indexPerson": false,
-      "notes": ""
+      "notes": "",
+      "twinGroup": null
     }
   ],
   "relationships": [
-    { "from": "p1", "to": "p2", "type": "marriage" }
+    {
+      "from": "p1",
+      "to": "p2",
+      "type": "marriage",
+      "parentKind": null
+    }
   ]
 }
 
 ## 規則
 1. generation：0 為最上代（祖父母等），數字越大越年輕。同一代必須相同。
-2. 親子：type 必須是 "parent"；**from = 父母，to = 子女**。父母雙方各連一條到同一子女。
-3. 夫妻/伴侶：使用 marriage、divorce、cohabitation、separation、separationInFact、widowed、engagement、loveAffair 等（見允許清單）。
-4. 情感關係（衝突、親密、暴力等）僅在使用者明確提到時使用。
-5. 指標個案 / IP / 案主 → indexPerson: true（通常一個）。
-6. 已故 / 過世 → deceased: true；若有卒年可填 deathYear。
-7. 未提及的性別用 "unknown"；不要臆造未描述的人物或關係。
-8. id 使用簡短穩定字串（p1, p2…），relationships 的 from/to 必須對應 persons.id。
-9. type **只能**是下列之一：
+2. 親子：type 必須是 "parent"；**from = 父母，to = 子女**。每一位明確提及的子女，都必須由文中提到的父母雙方各連一條 parent 關係，不得漏掉任何兄弟姊妹。
+3. 親生親子使用 parentKind: "biological"；收養、領養使用 parentKind: "adoptive"。parentKind 只用於 parent 關係。
+4. 雙胞胎／多胞胎：同一組孩子填入完全相同、非空的 twinGroup（例如 "twins-1"）；一般兄弟姊妹填 null。
+5. 夫妻/伴侶只輸出目前或最終狀態。若同一對人物先結婚後離婚，只輸出一條 type: "divorce"，不要同時輸出 marriage。其他狀態可使用 cohabitation、separation、separationInFact、widowed、engagement、loveAffair 等。
+6. 情感關係（衝突、親密、暴力等）僅在使用者明確提到時使用。
+7. 指標個案 / IP / 案主 → indexPerson: true（通常一個）。
+8. 已故 / 過世 → deceased: true；若有卒年可填 deathYear。
+9. 未提及的性別用 "unknown"；不要臆造未描述的人物或關係。
+10. id 使用簡短穩定字串（p1, p2…），relationships 的 from/to 必須對應 persons.id。
+11. type **只能**是下列之一：
 ${REL_TYPES}
 
 ## 範例

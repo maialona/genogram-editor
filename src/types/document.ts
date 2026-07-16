@@ -43,6 +43,8 @@ export type RelationshipType =
   | "engagementSeparation"
   | "loveAffair"
   | "parent"
+  | "adoptiveParent"
+  | "twin"
   // Emotional
   | "harmony"
   | "indifferent"

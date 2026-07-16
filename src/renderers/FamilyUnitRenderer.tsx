@@ -1,5 +1,5 @@
 import type { RelationshipType } from "../types/document";
-import type { FamilyUnitLayout } from "./familyUnits";
+import type { FamilyUnitLayout, ParentKind } from "./familyUnits";
 import { RELATIONSHIP_COLOR, SELECTION_COLOR, STROKE } from "./constants";
 import { renderCoupleLine } from "./coupleLine";
 
@@ -7,6 +7,61 @@ export interface FamilyUnitRendererProps {
   layout: FamilyUnitLayout;
   selectedIds: Set<string>;
   onPointerDown?: (e: React.PointerEvent, relationshipId: string) => void;
+}
+
+function ParentConnectionLine({
+  x1,
+  y1,
+  x2,
+  y2,
+  parentKind,
+  stroke,
+  strokeWidth,
+}: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  parentKind: ParentKind;
+  stroke: string;
+  strokeWidth: number;
+}) {
+  if (parentKind === "biological") {
+    return (
+      <line
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+      />
+    );
+  }
+
+  return (
+    <g className="adoptive-parent-line">
+      <line
+        className="adoptive-line-solid"
+        x1={x1 - 2}
+        y1={y1}
+        x2={x2 - 2}
+        y2={y2}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+      />
+      <line
+        className="adoptive-line-dashed"
+        x1={x1 + 3}
+        y1={y1}
+        x2={x2 + 3}
+        y2={y2}
+        stroke={stroke}
+        strokeWidth={Math.max(1, strokeWidth - 0.5)}
+        strokeDasharray="5 4"
+      />
+    </g>
+  );
 }
 
 /**
@@ -24,7 +79,7 @@ export function FamilyUnitRenderer({
   selectedIds,
   onPointerDown,
 }: FamilyUnitRendererProps) {
-  const { unit, couple, stem, childBar, childDrops } = layout;
+  const { unit, couple, stem, childBar, childDrops, twinBranches } = layout;
   const coupleSelected = unit.coupleRel
     ? selectedIds.has(unit.coupleRel.id)
     : false;
@@ -60,7 +115,7 @@ export function FamilyUnitRenderer({
       )}
 
       {/* Stem + children tree */}
-      {(stem || childBar || childDrops.length > 0) && (
+      {(stem || childBar || childDrops.length > 0 || twinBranches.length > 0) && (
         <g className="children-tree">
           {stem && (
             <g onPointerDown={hit(primaryRelId)}>
@@ -114,14 +169,60 @@ export function FamilyUnitRenderer({
                 stroke="transparent"
                 strokeWidth={14}
               />
-              <line
+              <ParentConnectionLine
                 x1={drop.x}
                 y1={drop.y1}
                 x2={drop.x}
                 y2={drop.y2}
+                parentKind={drop.parentKind}
                 stroke={stroke}
                 strokeWidth={strokeWidth}
               />
+            </g>
+          ))}
+
+          {twinBranches.map((branch) => (
+            <g key={branch.groupId} className="twin-branch">
+              <g onPointerDown={hit(branch.relId)}>
+                <line
+                  x1={branch.junctionX}
+                  y1={branch.y1}
+                  x2={branch.junctionX}
+                  y2={branch.junctionY}
+                  stroke="transparent"
+                  strokeWidth={14}
+                />
+                <ParentConnectionLine
+                  x1={branch.junctionX}
+                  y1={branch.y1}
+                  x2={branch.junctionX}
+                  y2={branch.junctionY}
+                  parentKind={branch.parentKind}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                />
+              </g>
+              {branch.children.map((child) => (
+                <g key={child.personId} onPointerDown={hit(child.relId)}>
+                  <line
+                    x1={branch.junctionX}
+                    y1={branch.junctionY}
+                    x2={child.x}
+                    y2={child.y2}
+                    stroke="transparent"
+                    strokeWidth={14}
+                  />
+                  <ParentConnectionLine
+                    x1={branch.junctionX}
+                    y1={branch.junctionY}
+                    x2={child.x}
+                    y2={child.y2}
+                    parentKind={child.parentKind}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                  />
+                </g>
+              ))}
             </g>
           ))}
         </g>

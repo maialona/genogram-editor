@@ -1,5 +1,8 @@
 import type { Gender, RelationshipType } from "../types/document";
-import { RELATIONSHIP_LABELS } from "../types/relationshipCatalog";
+import {
+  COUPLE_TYPES,
+  RELATIONSHIP_LABELS,
+} from "../types/relationshipCatalog";
 import type {
   AiGenogramDraft,
   AiPersonDraft,
@@ -8,6 +11,20 @@ import type {
 import { AiClientError } from "./types";
 
 const VALID_RELS = new Set(Object.keys(RELATIONSHIP_LABELS));
+
+const COUPLE_STATE_PRIORITY: Partial<Record<RelationshipType, number>> = {
+  divorce: 100,
+  widowed: 90,
+  separation: 80,
+  separationInFact: 70,
+  engagementSeparation: 60,
+  marriage: 50,
+  legalCohabitation: 45,
+  cohabitation: 40,
+  engagementCohabitation: 35,
+  engagement: 30,
+  loveAffair: 20,
+};
 
 const REL_ALIASES: Record<string, RelationshipType> = {
   married: "marriage",
@@ -143,6 +160,10 @@ export function parseAiGenogramDraft(content: string): {
       deceased: Boolean(p.deceased),
       indexPerson: Boolean(p.indexPerson),
       notes: typeof p.notes === "string" ? p.notes : "",
+      twinGroup:
+        typeof p.twinGroup === "string" && p.twinGroup.trim()
+          ? p.twinGroup.trim()
+          : undefined,
     });
   }
 
@@ -168,7 +189,76 @@ export function parseAiGenogramDraft(content: string): {
     }
     const type = asRelType(r.type, warnings);
     if (!type) continue;
-    relationships.push({ from, to, type });
+    const parentKind =
+      type === "parent" && r.parentKind === "adoptive"
+        ? "adoptive"
+        : type === "parent" && r.parentKind === "biological"
+          ? "biological"
+          : undefined;
+    relationships.push({ from, to, type, parentKind });
+  }
+
+  const normalizedRelationships: AiRelationshipDraft[] = [];
+  const coupleIndexByPair = new Map<string, number>();
+  for (const rel of relationships) {
+    if (!COUPLE_TYPES.has(rel.type)) {
+      normalizedRelationships.push(rel);
+      continue;
+    }
+
+    const pairKey = [rel.from, rel.to].sort().join("|");
+    const existingIndex = coupleIndexByPair.get(pairKey);
+    if (existingIndex == null) {
+      coupleIndexByPair.set(pairKey, normalizedRelationships.length);
+      normalizedRelationships.push(rel);
+      continue;
+    }
+
+    const existing = normalizedRelationships[existingIndex];
+    const existingPriority = COUPLE_STATE_PRIORITY[existing.type] ?? 0;
+    const nextPriority = COUPLE_STATE_PRIORITY[rel.type] ?? 0;
+    if (nextPriority >= existingPriority) {
+      normalizedRelationships[existingIndex] = rel;
+    }
+    warnings.push(
+      `伴侶關係 ${rel.from} ↔ ${rel.to} 已合併為最終狀態`
+    );
+  }
+  relationships.splice(0, relationships.length, ...normalizedRelationships);
+
+  const twinGroups = new Map<string, string[]>();
+  for (const person of persons) {
+    if (!person.twinGroup) continue;
+    const members = twinGroups.get(person.twinGroup) ?? [];
+    members.push(person.id);
+    twinGroups.set(person.twinGroup, members);
+  }
+
+  for (const [groupId, memberIds] of twinGroups) {
+    if (memberIds.length < 2) continue;
+    const memberSet = new Set(memberIds);
+    const templatesByParent = new Map<string, AiRelationshipDraft>();
+    for (const rel of relationships) {
+      if (rel.type === "parent" && memberSet.has(rel.to)) {
+        templatesByParent.set(rel.from, rel);
+      }
+    }
+
+    for (const childId of memberIds) {
+      for (const template of templatesByParent.values()) {
+        const exists = relationships.some(
+          (rel) =>
+            rel.type === "parent" &&
+            rel.from === template.from &&
+            rel.to === childId
+        );
+        if (exists) continue;
+        relationships.push({ ...template, to: childId });
+        warnings.push(
+          `雙胞胎群組「${groupId}」已補全 ${template.from} → ${childId} 的親子關係`
+        );
+      }
+    }
   }
 
   const draft: AiGenogramDraft = {
