@@ -4,6 +4,7 @@ import { SymbolLibrary } from "./components/SymbolLibrary";
 import { Canvas } from "./components/Canvas/Canvas";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { PropertyPanel } from "./components/PropertyPanel";
+import { AiChatbox } from "./components/AiChatbox";
 import { ToastHost } from "./components/ToastHost";
 import { useDocumentStore } from "./store/documentStore";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -30,6 +31,7 @@ function App() {
         <CanvasToolbar />
         <SymbolLibrary />
         <PropertyPanel />
+        <AiChatbox />
       </div>
 
       <ToastHost />
