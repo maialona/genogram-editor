@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { Toolbar } from "./components/Toolbar";
 import { SymbolLibrary } from "./components/SymbolLibrary";
 import { Canvas } from "./components/Canvas/Canvas";
+import { CanvasToolbar } from "./components/CanvasToolbar";
 import { PropertyPanel } from "./components/PropertyPanel";
+import { ToastHost } from "./components/ToastHost";
 import { useDocumentStore } from "./store/documentStore";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import "./App.css";
@@ -18,14 +20,19 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Toolbar />
-      <div className="app-main">
+      <main className="app-canvas-area" aria-label="家系圖畫布">
+        <Canvas />
+      </main>
+
+      {/* Spline-style floating chrome — does not reserve layout space */}
+      <div className="app-float-layer">
+        <Toolbar />
+        <CanvasToolbar />
         <SymbolLibrary />
-        <main className="app-canvas-area">
-          <Canvas />
-        </main>
         <PropertyPanel />
       </div>
+
+      <ToastHost />
     </div>
   );
 }

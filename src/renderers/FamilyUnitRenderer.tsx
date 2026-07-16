@@ -1,6 +1,7 @@
 import type { RelationshipType } from "../types/document";
 import type { FamilyUnitLayout } from "./familyUnits";
 import { RELATIONSHIP_COLOR, SELECTION_COLOR, STROKE } from "./constants";
+import { renderCoupleLine } from "./coupleLine";
 
 export interface FamilyUnitRendererProps {
   layout: FamilyUnitLayout;
@@ -127,73 +128,4 @@ export function FamilyUnitRenderer({
       )}
     </g>
   );
-}
-
-function renderCoupleLine(
-  type: RelationshipType,
-  couple: NonNullable<FamilyUnitLayout["couple"]>,
-  stroke: string,
-  strokeWidth: number
-): React.ReactNode {
-  const { x1, y1, x2, y2, midX, midY } = couple;
-  const base = (
-    <line
-      x1={x1}
-      y1={y1}
-      x2={x2}
-      y2={y2}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeDasharray={
-        type === "cohabitation"
-          ? "8 4"
-          : type === "engagement"
-            ? "3 3"
-            : undefined
-      }
-    />
-  );
-
-  if (type === "divorce") {
-    return (
-      <g>
-        {base}
-        {/* // marks */}
-        <line
-          x1={midX - 5}
-          y1={midY - 8}
-          x2={midX + 5}
-          y2={midY + 8}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-        />
-        <line
-          x1={midX - 1}
-          y1={midY - 8}
-          x2={midX + 9}
-          y2={midY + 8}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-        />
-      </g>
-    );
-  }
-
-  if (type === "separation") {
-    return (
-      <g>
-        {base}
-        <line
-          x1={midX}
-          y1={midY - 8}
-          x2={midX}
-          y2={midY + 8}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-        />
-      </g>
-    );
-  }
-
-  return base;
 }

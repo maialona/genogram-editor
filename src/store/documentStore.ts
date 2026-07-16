@@ -14,7 +14,17 @@ import {
   createPerson,
   createRelationship,
 } from "../types/document";
-import { loadDocument, saveDocument } from "../storage/storageManager";
+import {
+  loadDocument,
+  normalizeDocument,
+  saveDocument,
+  type SaveResult,
+} from "../storage/storageManager";
+import { showToast } from "./toastStore";
+import {
+  getPersonsBounds,
+  viewportToFitContent,
+} from "../utils/viewport";
 
 const MAX_HISTORY = 100;
 const PERSON_SIZE = 48;
@@ -30,6 +40,7 @@ interface ClipboardData {
 }
 
 export type InteractionMode = "select" | "pan" | "connect";
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface DocumentStore {
   document: Document;
@@ -40,10 +51,16 @@ interface DocumentStore {
   /** When connecting relationships: first person id, or null. */
   connectFromId: string | null;
   pendingRelationshipType: RelationshipType;
+  saveStatus: SaveStatus;
+  lastSavedAt: number | null;
+  /** Last measured canvas size (for fit-to-content after load). */
+  canvasSize: { width: number; height: number };
+  /** When true, fit once canvas has a valid size. */
+  pendingFitToContent: boolean;
 
   // Lifecycle
   hydrate: () => void;
-  persist: () => void;
+  persist: () => SaveResult;
 
   // History
   pushHistory: () => void;
@@ -54,6 +71,11 @@ interface DocumentStore {
 
   // Viewport (not part of undo history by default — independent save)
   setViewport: (viewport: Partial<Viewport>) => void;
+  setCanvasSize: (width: number, height: number) => void;
+  /** Center + scale content into the current canvas. */
+  fitViewportToContent: () => boolean;
+  /** Fit now, or queue until canvas size is known. */
+  requestFitToContent: () => void;
 
   // Selection
   select: (ids: SelectableId[], additive?: boolean) => void;
@@ -86,9 +108,12 @@ interface DocumentStore {
   copySelected: () => void;
   pasteClipboard: () => void;
 
-  // Document reset
+  // Document identity / reset / import
+  setTitle: (title: string) => void;
   newDocument: () => void;
   loadDocumentData: (document: Document) => void;
+  importDocumentJson: (raw: string) => { ok: true } | { ok: false; error: string };
+  hasContent: () => boolean;
 }
 
 function cloneDocument(doc: Document): Document {
@@ -99,290 +124,453 @@ function documentWithoutSelectionNoise(doc: Document): Document {
   return cloneDocument(doc);
 }
 
-export const useDocumentStore = create<DocumentStore>((set, get) => ({
-  document: createEmptyDocument(),
-  history: { past: [], future: [] },
-  selectedIds: [],
-  clipboard: null,
-  interactionMode: "select",
-  connectFromId: null,
-  pendingRelationshipType: "marriage",
+function withTimestamp(doc: Document): Document {
+  return { ...doc, updatedAt: Date.now() };
+}
 
-  hydrate: () => {
-    const doc = loadDocument();
-    set({ document: doc, history: { past: [], future: [] }, selectedIds: [] });
-  },
+function saveFailureMessage(result: SaveResult): string {
+  if (result.ok) return "";
+  if (result.reason === "quota") {
+    return "本機儲存空間不足，變更可能未保存";
+  }
+  if (result.reason === "unavailable") {
+    return "無法寫入本機儲存（可能為隱私模式），變更可能未保存";
+  }
+  return "自動儲存失敗，變更可能未保存";
+}
 
-  persist: () => {
-    saveDocument(get().document);
-  },
-
-  pushHistory: () => {
-    const { document, history } = get();
-    const past = [...history.past, documentWithoutSelectionNoise(document)].slice(
-      -MAX_HISTORY
-    );
-    set({ history: { past, future: [] } });
-  },
-
-  undo: () => {
-    const { document, history } = get();
-    if (history.past.length === 0) return;
-    const previous = history.past[history.past.length - 1];
-    const past = history.past.slice(0, -1);
-    const future = [cloneDocument(document), ...history.future].slice(
-      0,
-      MAX_HISTORY
-    );
-    set({
-      document: previous,
-      history: { past, future },
-      selectedIds: [],
-    });
-    saveDocument(previous);
-  },
-
-  redo: () => {
-    const { document, history } = get();
-    if (history.future.length === 0) return;
-    const next = history.future[0];
-    const future = history.future.slice(1);
-    const past = [...history.past, cloneDocument(document)].slice(-MAX_HISTORY);
+export const useDocumentStore = create<DocumentStore>((set, get) => {
+  const commit = (
+    document: Document,
+    extra?: Partial<
+      Pick<
+        DocumentStore,
+        | "selectedIds"
+        | "history"
+        | "connectFromId"
+        | "interactionMode"
+        | "pendingRelationshipType"
+        | "clipboard"
+      >
+    >,
+    options?: { toastOnError?: boolean }
+  ): SaveResult => {
+    const next = withTimestamp(document);
     set({
       document: next,
-      history: { past, future },
-      selectedIds: [],
+      saveStatus: "saving",
+      ...extra,
     });
-    saveDocument(next);
-  },
-
-  canUndo: () => get().history.past.length > 0,
-  canRedo: () => get().history.future.length > 0,
-
-  setViewport: (viewport) => {
-    const document = {
-      ...get().document,
-      viewport: { ...get().document.viewport, ...viewport },
-    };
-    set({ document });
-    saveDocument(document);
-  },
-
-  select: (ids, additive = false) => {
-    if (additive) {
-      const current = new Set(get().selectedIds);
-      for (const id of ids) {
-        if (current.has(id)) current.delete(id);
-        else current.add(id);
-      }
-      set({ selectedIds: Array.from(current) });
+    const result = saveDocument(next);
+    if (result.ok) {
+      set({ saveStatus: "saved", lastSavedAt: Date.now() });
     } else {
-      set({ selectedIds: [...ids] });
+      set({ saveStatus: "error" });
+      if (options?.toastOnError !== false) {
+        showToast(saveFailureMessage(result), { tone: "error", durationMs: 6000 });
+      }
     }
-  },
+    return result;
+  };
 
-  clearSelection: () => set({ selectedIds: [] }),
+  return {
+    document: createEmptyDocument(),
+    history: { past: [], future: [] },
+    selectedIds: [],
+    clipboard: null,
+    interactionMode: "select",
+    connectFromId: null,
+    pendingRelationshipType: "marriage",
+    saveStatus: "idle",
+    lastSavedAt: null,
+    canvasSize: { width: 0, height: 0 },
+    pendingFitToContent: false,
 
-  isSelected: (id) => get().selectedIds.includes(id),
+    hydrate: () => {
+      const doc = loadDocument();
+      set({
+        document: doc,
+        history: { past: [], future: [] },
+        selectedIds: [],
+        saveStatus: "saved",
+        lastSavedAt: Date.now(),
+      });
+    },
 
-  addPerson: (gender, x, y) => {
-    get().pushHistory();
-    const id = uuidv4();
-    const person = createPerson({
-      id,
-      gender,
-      x,
-      y,
-      name: gender === "male" ? "男" : gender === "female" ? "女" : "未知",
-    });
-    const document: Document = {
-      ...get().document,
-      persons: [...get().document.persons, person],
-    };
-    set({ document, selectedIds: [id] });
-    saveDocument(document);
-    return id;
-  },
+    persist: () => {
+      const { document } = get();
+      set({ saveStatus: "saving" });
+      const result = saveDocument(document);
+      if (result.ok) {
+        set({ saveStatus: "saved", lastSavedAt: Date.now() });
+      } else {
+        set({ saveStatus: "error" });
+        showToast(saveFailureMessage(result), { tone: "error", durationMs: 6000 });
+      }
+      return result;
+    },
 
-  updatePerson: (id, patch, options) => {
-    if (options?.recordHistory !== false) {
+    pushHistory: () => {
+      const { document, history } = get();
+      const past = [
+        ...history.past,
+        documentWithoutSelectionNoise(document),
+      ].slice(-MAX_HISTORY);
+      set({ history: { past, future: [] } });
+    },
+
+    undo: () => {
+      const { document, history } = get();
+      if (history.past.length === 0) return;
+      const previous = history.past[history.past.length - 1];
+      const past = history.past.slice(0, -1);
+      const future = [cloneDocument(document), ...history.future].slice(
+        0,
+        MAX_HISTORY
+      );
+      commit(previous, {
+        history: { past, future },
+        selectedIds: [],
+      });
+    },
+
+    redo: () => {
+      const { document, history } = get();
+      if (history.future.length === 0) return;
+      const next = history.future[0];
+      const future = history.future.slice(1);
+      const past = [...history.past, cloneDocument(document)].slice(-MAX_HISTORY);
+      commit(next, {
+        history: { past, future },
+        selectedIds: [],
+      });
+    },
+
+    canUndo: () => get().history.past.length > 0,
+    canRedo: () => get().history.future.length > 0,
+
+    setViewport: (viewport) => {
+      const document = {
+        ...get().document,
+        viewport: { ...get().document.viewport, ...viewport },
+      };
+      // Viewport-only changes: save quietly without bumping content updatedAt noise
+      set({ document, saveStatus: "saving" });
+      const result = saveDocument(document);
+      if (result.ok) {
+        set({ saveStatus: "saved", lastSavedAt: Date.now() });
+      } else {
+        set({ saveStatus: "error" });
+      }
+    },
+
+    setCanvasSize: (width, height) => {
+      const prev = get().canvasSize;
+      if (
+        Math.abs(prev.width - width) < 0.5 &&
+        Math.abs(prev.height - height) < 0.5
+      ) {
+        return;
+      }
+      set({ canvasSize: { width, height } });
+      if (get().pendingFitToContent && width > 0 && height > 0) {
+        get().fitViewportToContent();
+      }
+    },
+
+    fitViewportToContent: () => {
+      const { document, canvasSize } = get();
+      const bounds = getPersonsBounds(document.persons);
+      if (!bounds) {
+        set({ pendingFitToContent: false });
+        return false;
+      }
+      const next = viewportToFitContent(
+        bounds,
+        canvasSize.width,
+        canvasSize.height
+      );
+      if (!next) return false;
+      set({ pendingFitToContent: false });
+      get().setViewport(next);
+      return true;
+    },
+
+    requestFitToContent: () => {
+      const { canvasSize } = get();
+      if (canvasSize.width > 0 && canvasSize.height > 0) {
+        if (!get().fitViewportToContent()) {
+          set({ pendingFitToContent: true });
+        }
+        return;
+      }
+      set({ pendingFitToContent: true });
+    },
+
+    select: (ids, additive = false) => {
+      if (additive) {
+        const current = new Set(get().selectedIds);
+        for (const id of ids) {
+          if (current.has(id)) current.delete(id);
+          else current.add(id);
+        }
+        set({ selectedIds: Array.from(current) });
+      } else {
+        set({ selectedIds: [...ids] });
+      }
+    },
+
+    clearSelection: () => set({ selectedIds: [] }),
+
+    isSelected: (id) => get().selectedIds.includes(id),
+
+    addPerson: (gender, x, y) => {
       get().pushHistory();
-    }
-    const document: Document = {
-      ...get().document,
-      persons: get().document.persons.map((p) =>
-        p.id === id ? { ...p, ...patch } : p
-      ),
-    };
-    set({ document });
-    saveDocument(document);
-  },
+      const id = uuidv4();
+      const person = createPerson({
+        id,
+        gender,
+        x,
+        y,
+        name: "",
+      });
+      const document: Document = {
+        ...get().document,
+        persons: [...get().document.persons, person],
+      };
+      commit(document, { selectedIds: [id] });
+      return id;
+    },
 
-  movePersons: (ids, dx, dy) => {
-    if (dx === 0 && dy === 0) return;
-    const idSet = new Set(ids);
-    const document: Document = {
-      ...get().document,
-      persons: get().document.persons.map((p) =>
-        idSet.has(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p
-      ),
-    };
-    set({ document });
-  },
+    updatePerson: (id, patch, options) => {
+      if (options?.recordHistory !== false) {
+        get().pushHistory();
+      }
+      const document: Document = {
+        ...get().document,
+        persons: get().document.persons.map((p) =>
+          p.id === id ? { ...p, ...patch } : p
+        ),
+      };
+      commit(document);
+    },
 
-  setPersonPosition: (id, x, y) => {
-    const document: Document = {
-      ...get().document,
-      persons: get().document.persons.map((p) =>
-        p.id === id ? { ...p, x, y } : p
-      ),
-    };
-    set({ document });
-    saveDocument(document);
-  },
+    movePersons: (ids, dx, dy) => {
+      if (dx === 0 && dy === 0) return;
+      const idSet = new Set(ids);
+      const document: Document = {
+        ...get().document,
+        persons: get().document.persons.map((p) =>
+          idSet.has(p.id) ? { ...p, x: p.x + dx, y: p.y + dy } : p
+        ),
+      };
+      set({ document });
+    },
 
-  addRelationship: (from, to, type) => {
-    if (from === to) return "";
-    const exists = get().document.relationships.some(
-      (r) =>
-        r.type === type &&
-        ((r.from === from && r.to === to) || (r.from === to && r.to === from))
-    );
-    if (exists) return "";
+    setPersonPosition: (id, x, y) => {
+      const document: Document = {
+        ...get().document,
+        persons: get().document.persons.map((p) =>
+          p.id === id ? { ...p, x, y } : p
+        ),
+      };
+      commit(document);
+    },
 
-    get().pushHistory();
-    const id = uuidv4();
-    const relationship = createRelationship({ id, from, to, type });
-    const document: Document = {
-      ...get().document,
-      relationships: [...get().document.relationships, relationship],
-    };
-    // Stay in connect mode so user can keep drawing more lines.
-    set({
-      document,
-      selectedIds: [id],
-      connectFromId: null,
-      interactionMode: "connect",
-      pendingRelationshipType: type,
-    });
-    saveDocument(document);
-    return id;
-  },
+    addRelationship: (from, to, type) => {
+      if (from === to) return "";
+      const exists = get().document.relationships.some(
+        (r) =>
+          r.type === type &&
+          ((r.from === from && r.to === to) || (r.from === to && r.to === from))
+      );
+      if (exists) return "";
 
-  updateRelationship: (id, patch, options) => {
-    if (options?.recordHistory !== false) {
       get().pushHistory();
-    }
-    const document: Document = {
-      ...get().document,
-      relationships: get().document.relationships.map((r) =>
-        r.id === id ? { ...r, ...patch } : r
-      ),
-    };
-    set({ document });
-    saveDocument(document);
-  },
+      const id = uuidv4();
+      const relationship = createRelationship({ id, from, to, type });
+      const document: Document = {
+        ...get().document,
+        relationships: [...get().document.relationships, relationship],
+      };
+      // Stay in connect mode so user can keep drawing more lines.
+      commit(document, {
+        selectedIds: [id],
+        connectFromId: null,
+        interactionMode: "connect",
+        pendingRelationshipType: type,
+      });
+      return id;
+    },
 
-  setPendingRelationshipType: (type) =>
-    set({ pendingRelationshipType: type, interactionMode: "connect", connectFromId: null }),
+    updateRelationship: (id, patch, options) => {
+      if (options?.recordHistory !== false) {
+        get().pushHistory();
+      }
+      const document: Document = {
+        ...get().document,
+        relationships: get().document.relationships.map((r) =>
+          r.id === id ? { ...r, ...patch } : r
+        ),
+      };
+      commit(document);
+    },
 
-  setConnectFromId: (id) => set({ connectFromId: id }),
+    setPendingRelationshipType: (type) =>
+      set({
+        pendingRelationshipType: type,
+        interactionMode: "connect",
+        connectFromId: null,
+      }),
 
-  setInteractionMode: (mode) =>
-    set({ interactionMode: mode, connectFromId: null }),
+    setConnectFromId: (id) => set({ connectFromId: id }),
 
-  deleteSelected: () => {
-    const { selectedIds, document } = get();
-    if (selectedIds.length === 0) return;
-    get().pushHistory();
-    const idSet = new Set(selectedIds);
-    const next: Document = {
-      ...document,
-      persons: document.persons.filter((p) => !idSet.has(p.id)),
-      relationships: document.relationships.filter(
-        (r) => !idSet.has(r.id) && !idSet.has(r.from) && !idSet.has(r.to)
-      ),
-      annotations: document.annotations.filter((a) => !idSet.has(a.id)),
-    };
-    set({ document: next, selectedIds: [] });
-    saveDocument(next);
-  },
+    setInteractionMode: (mode) =>
+      set({ interactionMode: mode, connectFromId: null }),
 
-  copySelected: () => {
-    const { selectedIds, document } = get();
-    const personIds = new Set(
-      document.persons.filter((p) => selectedIds.includes(p.id)).map((p) => p.id)
-    );
-    if (personIds.size === 0) {
-      set({ clipboard: null });
-      return;
-    }
-    const persons = document.persons
-      .filter((p) => personIds.has(p.id))
-      .map((p) => structuredClone(p));
-    const relationships = document.relationships
-      .filter((r) => personIds.has(r.from) && personIds.has(r.to))
-      .map((r) => structuredClone(r));
-    set({ clipboard: { persons, relationships } });
-  },
+    deleteSelected: () => {
+      const { selectedIds, document } = get();
+      if (selectedIds.length === 0) return;
+      get().pushHistory();
+      const idSet = new Set(selectedIds);
+      const next: Document = {
+        ...document,
+        persons: document.persons.filter((p) => !idSet.has(p.id)),
+        relationships: document.relationships.filter(
+          (r) => !idSet.has(r.id) && !idSet.has(r.from) && !idSet.has(r.to)
+        ),
+        annotations: document.annotations.filter((a) => !idSet.has(a.id)),
+      };
+      commit(next, { selectedIds: [] });
+      showToast("已刪除選取項目", {
+        tone: "info",
+        durationMs: 5000,
+        action: {
+          label: "復原",
+          onClick: () => get().undo(),
+        },
+      });
+    },
 
-  pasteClipboard: () => {
-    const { clipboard } = get();
-    if (!clipboard || clipboard.persons.length === 0) return;
-    get().pushHistory();
+    copySelected: () => {
+      const { selectedIds, document } = get();
+      const personIds = new Set(
+        document.persons
+          .filter((p) => selectedIds.includes(p.id))
+          .map((p) => p.id)
+      );
+      if (personIds.size === 0) {
+        set({ clipboard: null });
+        return;
+      }
+      const persons = document.persons
+        .filter((p) => personIds.has(p.id))
+        .map((p) => structuredClone(p));
+      const relationships = document.relationships
+        .filter((r) => personIds.has(r.from) && personIds.has(r.to))
+        .map((r) => structuredClone(r));
+      set({ clipboard: { persons, relationships } });
+      showToast(`已複製 ${persons.length} 個人物`, { tone: "success", durationMs: 2000 });
+    },
 
-    const idMap = new Map<string, string>();
-    const offset = 40;
-    const newPersons = clipboard.persons.map((p) => {
-      const newId = uuidv4();
-      idMap.set(p.id, newId);
-      return { ...p, id: newId, x: p.x + offset, y: p.y + offset };
-    });
-    const newRelationships = clipboard.relationships
-      .map((r) => {
-        const from = idMap.get(r.from);
-        const to = idMap.get(r.to);
-        if (!from || !to) return null;
-        return { ...r, id: uuidv4(), from, to };
-      })
-      .filter((r): r is Relationship => r !== null);
+    pasteClipboard: () => {
+      const { clipboard } = get();
+      if (!clipboard || clipboard.persons.length === 0) return;
+      get().pushHistory();
 
-    const document: Document = {
-      ...get().document,
-      persons: [...get().document.persons, ...newPersons],
-      relationships: [...get().document.relationships, ...newRelationships],
-    };
-    set({
-      document,
-      selectedIds: newPersons.map((p) => p.id),
-    });
-    saveDocument(document);
-  },
+      const idMap = new Map<string, string>();
+      const offset = 40;
+      const newPersons = clipboard.persons.map((p) => {
+        const newId = uuidv4();
+        idMap.set(p.id, newId);
+        return { ...p, id: newId, x: p.x + offset, y: p.y + offset };
+      });
+      const newRelationships = clipboard.relationships
+        .map((r) => {
+          const from = idMap.get(r.from);
+          const to = idMap.get(r.to);
+          if (!from || !to) return null;
+          return { ...r, id: uuidv4(), from, to };
+        })
+        .filter((r): r is Relationship => r !== null);
 
-  newDocument: () => {
-    get().pushHistory();
-    const document = createEmptyDocument();
-    set({
-      document,
-      selectedIds: [],
-      connectFromId: null,
-      interactionMode: "select",
-    });
-    saveDocument(document);
-  },
+      const document: Document = {
+        ...get().document,
+        persons: [...get().document.persons, ...newPersons],
+        relationships: [...get().document.relationships, ...newRelationships],
+      };
+      commit(document, {
+        selectedIds: newPersons.map((p) => p.id),
+      });
+    },
 
-  loadDocumentData: (document) => {
-    get().pushHistory();
-    const next = cloneDocument(document);
-    set({
-      document: next,
-      selectedIds: [],
-      connectFromId: null,
-      interactionMode: "select",
-      history: { past: get().history.past, future: [] },
-    });
-    saveDocument(next);
-  },
-}));
+    setTitle: (title) => {
+      const trimmed = title.trim().slice(0, 120) || get().document.title;
+      if (trimmed === get().document.title) return;
+      // Title edits do not push undo stack (like Figma file rename)
+      const document: Document = {
+        ...get().document,
+        title: trimmed,
+      };
+      commit(document);
+    },
+
+    newDocument: () => {
+      get().pushHistory();
+      const document = createEmptyDocument();
+      commit(document, {
+        selectedIds: [],
+        connectFromId: null,
+        interactionMode: "select",
+      });
+      showToast("已建立新文件", { tone: "success", durationMs: 2500 });
+    },
+
+    loadDocumentData: (document) => {
+      get().pushHistory();
+      const next = normalizeDocument(cloneDocument(document));
+      commit(next, {
+        selectedIds: [],
+        connectFromId: null,
+        interactionMode: "select",
+        history: { past: get().history.past, future: [] },
+      });
+    },
+
+    importDocumentJson: (raw) => {
+      try {
+        const parsed = JSON.parse(raw) as Partial<Document>;
+        if (
+          !parsed ||
+          typeof parsed !== "object" ||
+          (!Array.isArray(parsed.persons) && !Array.isArray(parsed.relationships))
+        ) {
+          return { ok: false, error: "不是有效的家系圖 JSON" };
+        }
+        const next = normalizeDocument(parsed);
+        get().pushHistory();
+        commit(next, {
+          selectedIds: [],
+          connectFromId: null,
+          interactionMode: "select",
+          history: { past: get().history.past, future: [] },
+        });
+        showToast(`已匯入「${next.title}」`, { tone: "success" });
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "JSON 解析失敗，請確認檔案格式" };
+      }
+    },
+
+    hasContent: () => {
+      const d = get().document;
+      return (
+        d.persons.length > 0 ||
+        d.relationships.length > 0 ||
+        d.annotations.length > 0
+      );
+    },
+  };
+});
 
 export { PERSON_SIZE };

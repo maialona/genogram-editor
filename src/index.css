@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* Inter: modern UI Latin · Noto Sans TC: mainstream Traditional Chinese */
+  --font-sans:
+    "Inter", "Noto Sans TC", system-ui, -apple-system, "Segoe UI",
+    "PingFang TC", "Microsoft JhengHei", sans-serif;
+}
+
 html,
 body,
 #root {
@@ -14,11 +21,17 @@ body,
 }
 
 body {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font-family: inherit;
 }
 

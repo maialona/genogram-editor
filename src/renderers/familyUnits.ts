@@ -1,14 +1,8 @@
-import type { Document, Person, Relationship, RelationshipType } from "../types/document";
+import type { Document, Person, Relationship } from "../types/document";
+import { COUPLE_TYPES } from "../types/relationshipCatalog";
 import { PERSON_HALF } from "./constants";
 
-/** Relationship types that form a couple / partnership bar. */
-export const COUPLE_TYPES: ReadonlySet<RelationshipType> = new Set([
-  "marriage",
-  "divorce",
-  "separation",
-  "cohabitation",
-  "engagement",
-]);
+export { COUPLE_TYPES };
 
 export interface FamilyUnit {
   /** Stable key for React. */

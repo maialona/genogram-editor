@@ -33,12 +33,23 @@ npm run build
 
 ```json
 {
+  "title": "未命名家系圖",
   "persons": [],
   "relationships": [],
   "annotations": [],
-  "viewport": { "scale": 1, "offsetX": 0, "offsetY": 0 }
+  "viewport": { "scale": 1, "offsetX": 0, "offsetY": 0 },
+  "updatedAt": 0
 }
 ```
+
+## 產品閉環
+
+| 步驟 | 方式 |
+|------|------|
+| 建立 | 拖曳符號 / 載入示範 / 匯入 JSON |
+| 編輯 | 畫布操作 + 右側屬性 |
+| 確認已存 | 工具列顯示「已儲存 · 剛剛」（LocalStorage） |
+| 交付 | 工具列「匯出」→ PNG / SVG / JSON |
 
 ## 操作
 
@@ -52,3 +63,6 @@ npm run build
 | 刪除 | Delete / Backspace |
 | 複製貼上 | Ctrl+C / Ctrl+V |
 | 復原重做 | Ctrl+Z / Ctrl+Y |
+| 重命名文件 | 工具列標題欄 |
+| 匯出 | 工具列「匯出」PNG / SVG / JSON |
+| 匯入 | 工具列「匯入」JSON |

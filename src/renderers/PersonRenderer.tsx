@@ -6,6 +6,7 @@ import { SelectionLayer } from "./layers/SelectionLayer";
 import { MedicalLayer } from "./layers/MedicalLayer";
 import { IndexPersonLayer } from "./layers/IndexPersonLayer";
 import { HighlightLayer } from "./layers/HighlightLayer";
+import { CulturalMarkLayer } from "./layers/CulturalMarkLayer";
 
 export interface PersonRendererProps {
   person: Person;
@@ -18,13 +19,14 @@ export interface PersonRendererProps {
  * Pure person renderer — composes layers, never mutates Document.
  *
  * Person
- * ├── Base Shape
- * ├── Index Person Layer
+ * ├── Highlight
+ * ├── Index Person (double outline)
+ * ├── Cultural mark
+ * ├── Base Shape (+ orientation / age)
  * ├── Medical Layer
  * ├── Death Layer
  * ├── Text Layer
- * ├── Selection Layer
- * └── Highlight Layer
+ * └── Selection Layer
  */
 export function PersonRenderer({
   person,
@@ -41,9 +43,25 @@ export function PersonRenderer({
       style={{ cursor: "pointer" }}
     >
       <HighlightLayer active={highlighted} />
-      <IndexPersonLayer visible={person.indexPerson} />
-      <BaseShapeLayer gender={person.gender} />
-      <MedicalLayer conditions={person.medicalConditions} />
+      <IndexPersonLayer
+        visible={person.indexPerson}
+        gender={person.gender}
+        specialType={person.specialType}
+      />
+      <CulturalMarkLayer mark={person.culturalMark ?? "none"} />
+      <BaseShapeLayer
+        gender={person.gender}
+        specialType={person.specialType ?? "none"}
+        sexuality={person.sexuality ?? "none"}
+        transgender={person.transgender ?? "none"}
+        age={person.age}
+      />
+      <MedicalLayer
+        conditions={person.medicalConditions}
+        gender={person.gender}
+        specialType={person.specialType ?? "none"}
+        personId={person.id}
+      />
       <DeathLayer visible={person.deceased} />
       <TextLayer person={person} />
       <SelectionLayer selected={selected} />

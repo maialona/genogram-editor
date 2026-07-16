@@ -1,6 +1,17 @@
 import { useRef } from "react";
 import { useDocumentStore } from "../store/documentStore";
-import type { Gender, Person, Relationship, RelationshipType } from "../types/document";
+import type {
+  CulturalMark,
+  Gender,
+  Person,
+  Relationship,
+  RelationshipType,
+  Sexuality,
+  SpecialPersonType,
+  Transgender,
+} from "../types/document";
+import { ALL_REL_OPTIONS } from "../types/relationshipCatalog";
+import { MEDICAL_MARKERS } from "../types/medicalCatalog";
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: "male", label: "男性" },
@@ -8,18 +19,34 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: "unknown", label: "未知" },
 ];
 
-const REL_TYPE_OPTIONS: { value: RelationshipType; label: string }[] = [
-  { value: "marriage", label: "婚姻" },
-  { value: "divorce", label: "離婚" },
-  { value: "separation", label: "分居" },
-  { value: "cohabitation", label: "同居" },
-  { value: "engagement", label: "訂婚" },
-  { value: "parent", label: "親子" },
-  { value: "harmony", label: "和諧" },
-  { value: "close", label: "親密" },
-  { value: "conflict", label: "衝突" },
-  { value: "hostile", label: "疏離/敵對" },
-  { value: "abuse", label: "暴力/虐待" },
+const SEXUALITY_OPTIONS: { value: Sexuality; label: string }[] = [
+  { value: "none", label: "無" },
+  { value: "gay", label: "男同志" },
+  { value: "lesbian", label: "女同志" },
+  { value: "bisexualMale", label: "雙性戀（男）" },
+  { value: "bisexualFemale", label: "雙性戀（女）" },
+];
+
+const TRANS_OPTIONS: { value: Transgender; label: string }[] = [
+  { value: "none", label: "無" },
+  { value: "mtf", label: "跨性（男→女）" },
+  { value: "ftm", label: "跨性（女→男）" },
+];
+
+const SPECIAL_OPTIONS: { value: SpecialPersonType; label: string }[] = [
+  { value: "none", label: "無" },
+  { value: "pregnancy", label: "懷孕" },
+  { value: "pet", label: "寵物" },
+  { value: "institution", label: "機構" },
+  { value: "miscarriage", label: "流產" },
+  { value: "abortion", label: "墮胎" },
+  { value: "stillbirth", label: "死產" },
+];
+
+const CULTURE_OPTIONS: { value: CulturalMark; label: string }[] = [
+  { value: "none", label: "無" },
+  { value: "multiCulture", label: "多文化居住" },
+  { value: "immigration", label: "移民" },
 ];
 
 function parseOptionalNumber(value: string): number | null {
@@ -54,6 +81,15 @@ function PersonProperties({ person }: { person: Person }) {
     updatePerson(person.id, { [key]: value } as Partial<Person>, {
       recordHistory: false,
     });
+  };
+
+  const toggleMedical = (id: string) => {
+    history.beforeChange();
+    const has = person.medicalConditions.includes(id);
+    const medicalConditions = has
+      ? person.medicalConditions.filter((c) => c !== id)
+      : [...person.medicalConditions, id];
+    updatePerson(person.id, { medicalConditions }, { recordHistory: false });
   };
 
   return (
@@ -117,7 +153,7 @@ function PersonProperties({ person }: { person: Person }) {
       </label>
 
       <label className="prop-field">
-        <span>年齡</span>
+        <span>年齡（符號內）</span>
         <input
           type="number"
           value={person.age ?? ""}
@@ -151,26 +187,111 @@ function PersonProperties({ person }: { person: Person }) {
       </label>
 
       <label className="prop-field">
-        <span>醫療狀況（逗號分隔）</span>
+        <span>性傾向符號</span>
+        <select
+          value={person.sexuality ?? "none"}
+          onFocus={history.onFocus}
+          onChange={(e) => set("sexuality", e.target.value as Sexuality)}
+        >
+          {SEXUALITY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="prop-field">
+        <span>跨性別符號</span>
+        <select
+          value={person.transgender ?? "none"}
+          onFocus={history.onFocus}
+          onChange={(e) => set("transgender", e.target.value as Transgender)}
+        >
+          {TRANS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="prop-field">
+        <span>特殊符號</span>
+        <select
+          value={person.specialType ?? "none"}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            set("specialType", e.target.value as SpecialPersonType)
+          }
+        >
+          {SPECIAL_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="prop-field">
+        <span>文化／移民標記</span>
+        <select
+          value={person.culturalMark ?? "none"}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            set("culturalMark", e.target.value as CulturalMark)
+          }
+        >
+          {CULTURE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="prop-field">
+        <span>醫療狀況</span>
+        <div className="medical-check-list">
+          {MEDICAL_MARKERS.map((m) => (
+            <label key={m.id} className="prop-check compact">
+              <input
+                type="checkbox"
+                checked={person.medicalConditions.includes(m.id)}
+                onChange={() => {
+                  history.onFocus();
+                  toggleMedical(m.id);
+                }}
+              />
+              <span>{m.labelZh}</span>
+            </label>
+          ))}
+        </div>
         <input
           type="text"
-          value={person.medicalConditions.join(", ")}
+          className="prop-medical-extra"
+          value={person.medicalConditions
+            .filter((c) => !MEDICAL_MARKERS.some((m) => m.id === c))
+            .join(", ")}
           onFocus={history.onFocus}
           onChange={(e) => {
-            const medicalConditions = e.target.value
+            const extras = e.target.value
               .split(",")
               .map((s) => s.trim())
               .filter(Boolean);
-            set("medicalConditions", medicalConditions);
+            const known = person.medicalConditions.filter((c) =>
+              MEDICAL_MARKERS.some((m) => m.id === c)
+            );
+            set("medicalConditions", [...known, ...extras]);
           }}
-          placeholder="例如：糖尿病, 高血壓"
+          placeholder="其他自由文字（逗號分隔）"
         />
-      </label>
+      </div>
 
       <label className="prop-field">
         <span>備註</span>
         <textarea
-          rows={4}
+          rows={3}
           value={person.notes}
           onFocus={history.onFocus}
           onChange={(e) => set("notes", e.target.value)}
@@ -206,7 +327,7 @@ function RelationshipProperties({ relationship }: { relationship: Relationship }
             );
           }}
         >
-          {REL_TYPE_OPTIONS.map((o) => (
+          {ALL_REL_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -237,6 +358,8 @@ function MultiPersonConnect({ persons }: { persons: Person[] }) {
     { type: "parent", label: "親子" },
     { type: "divorce", label: "離婚" },
     { type: "conflict", label: "衝突" },
+    { type: "harmony", label: "和諧" },
+    { type: "close", label: "親密" },
   ];
 
   return (
@@ -267,6 +390,7 @@ function MultiPersonConnect({ persons }: { persons: Person[] }) {
 export function PropertyPanel() {
   const selectedIds = useDocumentStore((s) => s.selectedIds);
   const document = useDocumentStore((s) => s.document);
+  const deleteSelected = useDocumentStore((s) => s.deleteSelected);
 
   const selectedPersons = document.persons.filter((p) =>
     selectedIds.includes(p.id)
@@ -276,14 +400,19 @@ export function PropertyPanel() {
   );
 
   return (
-    <aside className="property-panel">
+    <aside
+      className="float-panel property-panel"
+      aria-labelledby="property-panel-heading"
+    >
       <header className="panel-header">
-        <h2>屬性</h2>
+        <h2 id="property-panel-heading">屬性</h2>
       </header>
       <div className="property-panel-body">
         {selectedIds.length === 0 && (
           <div className="prop-empty-block">
-            <p className="prop-empty">選取畫布上的物件以編輯屬性</p>
+            <p className="prop-empty" role="status">
+              選取畫布上的物件以編輯屬性
+            </p>
             <p className="prop-hint muted">
               拉線：左側點「婚姻」→ 從人物 <strong>拖到</strong> 另一人物
             </p>
@@ -312,6 +441,20 @@ export function PropertyPanel() {
 
         {selectedPersons.length > 2 && (
           <p className="prop-empty">已選取 {selectedPersons.length} 個人物</p>
+        )}
+
+        {selectedIds.length > 0 && (
+          <div className="prop-actions">
+            <button
+              type="button"
+              className="prop-delete-btn"
+              onClick={() => deleteSelected()}
+              title="刪除選取項目（Delete / Backspace）"
+            >
+              刪除選取
+              <kbd className="prop-kbd">Del</kbd>
+            </button>
+          </div>
         )}
       </div>
     </aside>
