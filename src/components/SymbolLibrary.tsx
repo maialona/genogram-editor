@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import type {
   CulturalMark,
   Gender,
@@ -907,9 +907,7 @@ export function SymbolLibrary() {
     (s) => s.pendingRelationshipType
   );
 
-  const searchId = useId();
   const headingId = useId();
-  const [query, setQuery] = useState("");
   const [openMap, setOpenMap] = useState<Record<SectionId, boolean>>(loadOpenMap);
 
   useEffect(() => {
@@ -919,24 +917,6 @@ export function SymbolLibrary() {
       /* quota / private mode */
     }
   }, [openMap]);
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const isSearching = normalizedQuery.length > 0;
-
-  const filteredSections = useMemo(() => {
-    return SECTIONS.map((section) => {
-      if (!isSearching) return section;
-      const items = section.items.filter((item) =>
-        item.label.toLowerCase().includes(normalizedQuery)
-      );
-      return { ...section, items };
-    }).filter((section) => section.items.length > 0);
-  }, [isSearching, normalizedQuery]);
-
-  const matchCount = useMemo(
-    () => filteredSections.reduce((n, s) => n + s.items.length, 0),
-    [filteredSections]
-  );
 
   const toggleSection = useCallback((id: SectionId) => {
     setOpenMap((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -1100,7 +1080,7 @@ export function SymbolLibrary() {
 
   const renderSection = (section: SectionDef) => {
     const panelId = `symbol-section-${section.id}`;
-    const open = isSearching || openMap[section.id];
+    const open = openMap[section.id];
 
     return (
       <section className="symbol-section" key={section.id}>
@@ -1110,11 +1090,7 @@ export function SymbolLibrary() {
             className="symbol-section-toggle"
             aria-expanded={open}
             aria-controls={panelId}
-            onClick={() => {
-              if (isSearching) return;
-              toggleSection(section.id);
-            }}
-            disabled={isSearching}
+            onClick={() => toggleSection(section.id)}
           >
             <span className="symbol-section-chevron" aria-hidden="true">
               {open ? "▾" : "▸"}
@@ -1148,41 +1124,7 @@ export function SymbolLibrary() {
         <h2 id={headingId}>符號庫</h2>
       </header>
       <div className="symbol-library-body">
-        <div className="symbol-search">
-          <label className="sr-only" htmlFor={searchId}>
-            搜尋符號
-          </label>
-          <input
-            id={searchId}
-            type="search"
-            className="symbol-search-input"
-            placeholder="搜尋符號…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          {query && (
-            <button
-              type="button"
-              className="symbol-search-clear"
-              onClick={() => setQuery("")}
-              aria-label="清除搜尋"
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        {isSearching && (
-          <p className="symbol-search-meta" role="status" aria-live="polite">
-            {matchCount > 0
-              ? `找到 ${matchCount} 個符號`
-              : `沒有符合「${query.trim()}」的符號`}
-          </p>
-        )}
-
-        {filteredSections.map(renderSection)}
+        {SECTIONS.map(renderSection)}
       </div>
     </aside>
   );
