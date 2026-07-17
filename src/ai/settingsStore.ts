@@ -23,6 +23,12 @@ export const PROVIDER_PRESETS: Record<
     defaultModel: "gpt-4o-mini",
     models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
   },
+  deepseek: {
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    defaultModel: "deepseek-v4-flash",
+    models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+  },
 };
 
 const DEFAULT_SETTINGS: AiSettings = {
@@ -40,6 +46,7 @@ function loadSettings(): AiSettings {
     const parsed = JSON.parse(raw) as Partial<AiSettings>;
     const provider: AiProviderId =
       parsed.provider === "openai" ||
+      parsed.provider === "deepseek" ||
       parsed.provider === "custom" ||
       parsed.provider === "xai"
         ? parsed.provider

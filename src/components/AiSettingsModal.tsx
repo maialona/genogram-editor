@@ -117,6 +117,7 @@ export function AiSettingsModal({ open, onClose }: AiSettingsModalProps) {
           >
             <option value="xai">{PROVIDER_PRESETS.xai.label}</option>
             <option value="openai">{PROVIDER_PRESETS.openai.label}</option>
+            <option value="deepseek">{PROVIDER_PRESETS.deepseek.label}</option>
             <option value="custom">Custom（OpenAI 相容）</option>
           </select>
         </label>

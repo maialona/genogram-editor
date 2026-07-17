@@ -1,6 +1,6 @@
 import type { Gender, RelationshipType } from "../types/document";
 
-export type AiProviderId = "xai" | "openai" | "custom";
+export type AiProviderId = "xai" | "openai" | "deepseek" | "custom";
 
 export interface AiSettings {
   apiKey: string;

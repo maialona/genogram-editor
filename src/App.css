@@ -1819,6 +1819,12 @@
   padding-right: 28px;
 }
 
+/* Native <option> popup often uses a light OS surface; keep dark text. */
+.ai-settings-field select option {
+  color: #111827;
+  background: #fff;
+}
+
 .ai-settings-check {
   display: flex;
   align-items: flex-start;
