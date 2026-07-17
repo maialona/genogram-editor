@@ -172,16 +172,16 @@ interface SectionDef {
   id: SectionId;
   title: string;
   items: LibraryItem[];
-  /** Default open to keep common tools visible; rarer groups start collapsed. */
+  /** Sections start collapsed so the panel stays compact until opened. */
   defaultOpen: boolean;
 }
 
 const SECTIONS: SectionDef[] = [
-  { id: "persons", title: "人物", items: PERSONS, defaultOpen: true },
-  { id: "statuses", title: "人物狀態", items: STATUSES, defaultOpen: true },
+  { id: "persons", title: "人物", items: PERSONS, defaultOpen: false },
+  { id: "statuses", title: "人物狀態", items: STATUSES, defaultOpen: false },
   { id: "specials", title: "特殊符號", items: SPECIALS, defaultOpen: false },
-  { id: "family", title: "家庭關係", items: FAMILY_RELS, defaultOpen: true },
-  { id: "emotion", title: "情感關係", items: EMOTION_RELS, defaultOpen: true },
+  { id: "family", title: "家庭關係", items: FAMILY_RELS, defaultOpen: false },
+  { id: "emotion", title: "情感關係", items: EMOTION_RELS, defaultOpen: false },
   {
     id: "medicalMono",
     title: "醫療（單色）",

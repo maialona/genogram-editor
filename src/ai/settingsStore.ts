@@ -33,9 +33,9 @@ export const PROVIDER_PRESETS: Record<
 
 const DEFAULT_SETTINGS: AiSettings = {
   apiKey: "",
-  provider: "xai",
-  baseUrl: PROVIDER_PRESETS.xai.baseUrl,
-  model: PROVIDER_PRESETS.xai.defaultModel,
+  provider: "deepseek",
+  baseUrl: PROVIDER_PRESETS.deepseek.baseUrl,
+  model: PROVIDER_PRESETS.deepseek.defaultModel,
   useProxy: true,
 };
 
@@ -50,7 +50,7 @@ function loadSettings(): AiSettings {
       parsed.provider === "custom" ||
       parsed.provider === "xai"
         ? parsed.provider
-        : "xai";
+        : "deepseek";
 
     const preset =
       provider === "custom" ? null : PROVIDER_PRESETS[provider];
