@@ -1,11 +1,18 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": null,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/llm-proxy.js": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
+      "source": "/llm-proxy",
+      "destination": "/api/llm-proxy"
+    },
+    {
       "source": "/llm-proxy/:path*",
-      "destination": "/api/llm-proxy/:path*"
+      "destination": "/api/llm-proxy?rest=:path*"
     },
     {
       "source": "/((?!api/).*)",
