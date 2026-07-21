@@ -55,21 +55,45 @@ npm run build
 
 底部 chatbox 用自然語言描述個案家庭關係，AI 會解析人物與關係並自動排版到畫布。
 
-1. `npm run dev` 啟動（建議開啟「使用本機代理」以避免瀏覽器 CORS）
+1. 本機：`npm run dev`；線上：部署到 Vercel（見下方）
 2. 點 chatbox 左下角模型名稱 → **AI 設定**
 3. 貼上你自己的 API Key（存在本機 `localStorage`，不會進 repo）
-4. 選擇供應商：
+4. 保持「使用代理」開啟（避免 CORS；本機走 Vite middleware，Vercel 走 serverless）
+5. 選擇供應商：
+   - **DeepSeek**：`https://api.deepseek.com`（預設 `deepseek-v4-flash`）
    - **xAI (Grok)**：`https://api.x.ai/v1`（預設 `grok-4.5`）
    - **OpenAI**：`https://api.openai.com/v1`
-   - **Custom**：任何 OpenAI-compatible endpoint
-5. 描述後送出，例如：
+   - **Custom**：OpenAI-compatible endpoint（線上代理需在 Vercel 環境變數允許該 host，見下）
+6. 描述後送出，例如：
 
 ```text
 指標個案小明，男，30 歲。父親王大明、母親林美華已婚。小明有妹妹小華。
 ```
 
 畫布會被 AI 結果**取代**（可 `Ctrl+Z` 復原）。  
-**安全**：純前端會把 key 帶在請求 Authorization 標頭；僅適合個人本機使用。
+**安全**：瀏覽器會把 key 放在 `Authorization` 標頭，經同源代理轉發到供應商；key 不寫入本專案後端儲存。僅適合個人使用。
+
+## 部署到 Vercel
+
+本專案為 Vite SPA + `/api/llm-proxy` serverless 代理：
+
+1. 匯入 GitHub repo 到 Vercel（或 `vercel` CLI）
+2. Build 會讀 `vercel.json`（`npm run build` → `dist`）
+3. 部署後保持 AI 設定中「使用代理」開啟即可呼叫 DeepSeek / xAI / OpenAI
+
+**代理允許的 host（預設）**
+
+- `api.deepseek.com`
+- `api.x.ai`
+- `api.openai.com`
+
+若 Custom Base URL 使用其他網域，在 Vercel 專案設定加入環境變數：
+
+```text
+LLM_PROXY_ALLOWED_HOSTS=your-llm-host.example.com,another.example.com
+```
+
+（逗號分隔 hostname，不含 `https://`）
 
 ## 操作
 

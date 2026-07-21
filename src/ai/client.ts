@@ -76,7 +76,7 @@ export async function generateGenogramDraft(
     if (/failed to fetch|networkerror|cors/i.test(msg)) {
       throw new AiClientError(
         "cors",
-        "無法連線 API（可能是 CORS 或網路問題）。請在設定開啟「使用本機代理」，並以 npm run dev 啟動。"
+        "無法連線 API（可能是 CORS 或網路問題）。請開啟「使用本機代理」（本機需 npm run dev；Vercel 部署已內建代理）。"
       );
     }
     throw new AiClientError("network", `網路錯誤：${msg}`);
@@ -94,10 +94,28 @@ export async function generateGenogramDraft(
     const apiMsg =
       body?.error?.message ||
       (rawText.length < 280 ? rawText : `HTTP ${response.status}`);
-    if (response.status === 401 || response.status === 403) {
+    if (
+      response.status === 404 &&
+      settings.useProxy &&
+      (/NOT_FOUND|page could not be found|Cannot POST \/llm-proxy/i.test(
+        rawText
+      ) ||
+        /NOT_FOUND|page could not be found/i.test(apiMsg))
+    ) {
       throw new AiClientError(
         "http",
-        `API Key 無效或權限不足（${response.status}）：${apiMsg}`,
+        "找不到 AI 代理（/llm-proxy）。本機請用 npm run dev；線上請確認已部署含 Vercel serverless proxy 的版本。",
+        response.status
+      );
+    }
+    if (response.status === 401 || response.status === 403) {
+      const isProxyHostBlock =
+        settings.useProxy && /Host not allowed by proxy/i.test(apiMsg);
+      throw new AiClientError(
+        "http",
+        isProxyHostBlock
+          ? `代理拒絕此 Base URL（${response.status}）：${apiMsg}`
+          : `API Key 無效或權限不足（${response.status}）：${apiMsg}`,
         response.status
       );
     }
