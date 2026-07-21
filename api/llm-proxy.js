@@ -6,6 +6,8 @@
  *
  * Host allowlist prevents open-proxy / SSRF abuse.
  * Extra hosts: LLM_PROXY_ALLOWED_HOSTS=host1,host2
+ *
+ * Note: package.json has "type": "module", so this file uses ESM.
  */
 
 const DEFAULT_ALLOWED_HOSTS = [
@@ -28,12 +30,10 @@ function firstQuery(value) {
 }
 
 function restPathFromQuery(req) {
-  // Prefer rewrite-provided rest, then default OpenAI chat path.
-  const rest = firstQuery(req.query.rest) || firstQuery(req.query.path);
+  const rest = firstQuery(req.query?.rest) || firstQuery(req.query?.path);
   if (rest) {
     return rest.startsWith("/") ? rest : `/${rest}`;
   }
-  // Fallback: strip /api/llm-proxy or /llm-proxy prefix from URL path
   const urlPath = (req.url || "").split("?")[0] || "";
   const m = urlPath.match(/\/(?:api\/)?llm-proxy(\/.*)?$/);
   if (m && m[1]) return m[1];
@@ -83,7 +83,13 @@ function serializeBody(body) {
   return JSON.stringify(body);
 }
 
-module.exports = async function handler(req, res) {
+function sendJson(res, status, payload) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(payload));
+}
+
+export default async function handler(req, res) {
   try {
     if (req.method === "OPTIONS") {
       res.statusCode = 204;
@@ -97,32 +103,24 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "GET") {
-      res.statusCode = 200;
-      res.setHeader("Content-Type", "application/json");
-      res.end(
-        JSON.stringify({
-          ok: true,
-          service: "genogram-editor-llm-proxy",
-          allowedHosts: [...getAllowedHosts()],
-        })
-      );
+      sendJson(res, 200, {
+        ok: true,
+        service: "genogram-editor-llm-proxy",
+        allowedHosts: [...getAllowedHosts()],
+      });
       return;
     }
 
     if (req.method !== "POST") {
-      res.statusCode = 405;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: { message: "Method not allowed" } }));
+      sendJson(res, 405, { error: { message: "Method not allowed" } });
       return;
     }
 
-    const targetBase = firstQuery(req.query.target);
+    const targetBase = firstQuery(req.query?.target);
     const restPath = restPathFromQuery(req);
     const resolved = resolveTarget(targetBase, restPath);
     if (!resolved.ok) {
-      res.statusCode = resolved.status;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: { message: resolved.message } }));
+      sendJson(res, resolved.status, { error: { message: resolved.message } });
       return;
     }
 
@@ -135,7 +133,7 @@ module.exports = async function handler(req, res) {
 
     const body = serializeBody(req.body);
 
-    const upstream = await fetch(resolved.dest, {
+    const upstream = await fetch(resolved.dest.toString(), {
       method: "POST",
       headers,
       body,
@@ -146,14 +144,10 @@ module.exports = async function handler(req, res) {
     if (ct) res.setHeader("Content-Type", ct);
     res.end(await upstream.text());
   } catch (err) {
-    res.statusCode = 502;
-    res.setHeader("Content-Type", "application/json");
-    res.end(
-      JSON.stringify({
-        error: {
-          message: err instanceof Error ? err.message : "LLM proxy failed",
-        },
-      })
-    );
+    sendJson(res, 502, {
+      error: {
+        message: err instanceof Error ? err.message : "LLM proxy failed",
+      },
+    });
   }
-};
+}
