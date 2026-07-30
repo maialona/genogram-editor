@@ -18,7 +18,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import "./App.css";
 import "./components/AiEdgeGlow/AiEdgeGlow.css";
 
-function Editor() {
+function Editor({ onLogoClick }: { onLogoClick: () => void }) {
   const hydrate = useDocumentStore((s) => s.hydrate);
   const generationPhase = useAiGenerationStore((s) => s.phase);
   const isGenerating =
@@ -44,7 +44,7 @@ function Editor() {
 
       {/* Spline-style floating chrome — does not reserve layout space */}
       <div className="app-float-layer">
-        <Toolbar />
+        <Toolbar onLogoClick={onLogoClick} />
         <CanvasToolbar />
         <SymbolLibrary />
         <PropertyPanel />
@@ -65,9 +65,17 @@ function App() {
     transitionRef.current?.play(() => setShowEditor(true));
   };
 
+  const handleLogoClick = () => {
+    transitionRef.current?.play(() => setShowEditor(false));
+  };
+
   return (
     <>
-      {showEditor ? <Editor /> : <LandingPage onGetStarted={handleGetStarted} />}
+      {showEditor ? (
+        <Editor onLogoClick={handleLogoClick} />
+      ) : (
+        <LandingPage onGetStarted={handleGetStarted} />
+      )}
       <PageTransition ref={transitionRef} />
     </>
   );

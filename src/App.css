@@ -110,15 +110,24 @@
 }
 
 .brand-mark {
+  appearance: none;
+  border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 30px;
   height: 30px;
+  padding: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
+  cursor: pointer;
   flex-shrink: 0;
+  transition: background 0.12s ease;
+}
+
+.brand-mark:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .brand-mark svg {
@@ -309,6 +318,68 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── Icon-button hover tooltip ─────────────────────────── */
+
+.icon-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.icon-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  white-space: nowrap;
+  background: rgba(20, 20, 22, 0.98);
+  color: #f4f4f5;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 5px 9px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+  z-index: 60;
+}
+
+.icon-tooltip::before {
+  content: "";
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: rgba(20, 20, 22, 0.98);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 60;
+}
+
+.icon-tooltip:hover::after,
+.icon-tooltip:hover::before,
+.icon-tooltip:focus-within::after,
+.icon-tooltip:focus-within::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-tooltip::after,
+  .icon-tooltip::before {
+    transition: none;
+  }
 }
 
 .toolbar-icon-btn {
@@ -2001,6 +2072,7 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
+.brand-mark:focus-visible,
 .toolbar-icon-btn:focus-visible,
 .export-cta:focus-visible,
 .doc-title-input:focus-visible,

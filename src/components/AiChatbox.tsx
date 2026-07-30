@@ -203,6 +203,8 @@ export function AiChatbox() {
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ignore Enter while an IME composition (e.g. selecting a candidate) is in progress.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void send();

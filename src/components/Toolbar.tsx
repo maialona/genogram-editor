@@ -30,7 +30,11 @@ interface MenuPos {
   minWidth: number;
 }
 
-export function Toolbar() {
+interface ToolbarProps {
+  onLogoClick: () => void;
+}
+
+export function Toolbar({ onLogoClick }: ToolbarProps) {
   const newDocument = useDocumentStore((s) => s.newDocument);
   const loadDocumentData = useDocumentStore((s) => s.loadDocumentData);
   const requestFitToContent = useDocumentStore((s) => s.requestFitToContent);
@@ -194,9 +198,15 @@ export function Toolbar() {
     <header className="float-chrome" role="banner">
       {/* Top-left: identity + document title (Spline-style pill) */}
       <div className="float-bar float-bar-tl">
-        <span className="brand-mark" aria-hidden="true">
+        <button
+          type="button"
+          className="brand-mark"
+          onClick={onLogoClick}
+          title="回到首頁"
+          aria-label="回到首頁"
+        >
           <Network size={15} strokeWidth={2} />
-        </span>
+        </button>
         <div className="float-title-block">
           <label className="sr-only" htmlFor="doc-title">
             文件標題
@@ -227,33 +237,36 @@ export function Toolbar() {
 
       {/* Top-right: document actions + export CTA */}
       <div className="float-bar float-bar-tr" role="group" aria-label="文件">
-        <button
-          type="button"
-          className="toolbar-icon-btn"
-          onClick={handleNew}
-          title="新建文件"
-          aria-label="新建文件"
-        >
-          <FilePlus2 {...ICON} />
-        </button>
-        <button
-          type="button"
-          className="toolbar-icon-btn"
-          onClick={handleSample}
-          title="載入示範家系圖"
-          aria-label="載入示範家系圖"
-        >
-          <Network {...ICON} />
-        </button>
-        <button
-          type="button"
-          className="toolbar-icon-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="從 JSON 匯入"
-          aria-label="從 JSON 匯入"
-        >
-          <Upload {...ICON} />
-        </button>
+        <span className="icon-tooltip" data-tooltip="新建文件">
+          <button
+            type="button"
+            className="toolbar-icon-btn"
+            onClick={handleNew}
+            aria-label="新建文件"
+          >
+            <FilePlus2 {...ICON} />
+          </button>
+        </span>
+        <span className="icon-tooltip" data-tooltip="載入示範家系圖">
+          <button
+            type="button"
+            className="toolbar-icon-btn"
+            onClick={handleSample}
+            aria-label="載入示範家系圖"
+          >
+            <Network {...ICON} />
+          </button>
+        </span>
+        <span className="icon-tooltip" data-tooltip="從 JSON 匯入">
+          <button
+            type="button"
+            className="toolbar-icon-btn"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="從 JSON 匯入"
+          >
+            <Upload {...ICON} />
+          </button>
+        </span>
         <input
           ref={fileInputRef}
           type="file"
