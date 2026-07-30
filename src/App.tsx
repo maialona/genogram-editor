@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toolbar } from "./components/Toolbar";
 import { SymbolLibrary } from "./components/SymbolLibrary";
 import { Canvas } from "./components/Canvas/Canvas";
@@ -7,13 +7,18 @@ import { PropertyPanel } from "./components/PropertyPanel";
 import { AiChatbox } from "./components/AiChatbox";
 import { AiEdgeGlow } from "./components/AiEdgeGlow/AiEdgeGlow";
 import { ToastHost } from "./components/ToastHost";
+import { LandingPage } from "./components/LandingPage";
+import {
+  PageTransition,
+  type PageTransitionHandle,
+} from "./components/PageTransition";
 import { useDocumentStore } from "./store/documentStore";
 import { useAiGenerationStore } from "./store/aiGenerationStore";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import "./App.css";
 import "./components/AiEdgeGlow/AiEdgeGlow.css";
 
-function App() {
+function Editor() {
   const hydrate = useDocumentStore((s) => s.hydrate);
   const generationPhase = useAiGenerationStore((s) => s.phase);
   const isGenerating =
@@ -49,6 +54,22 @@ function App() {
       <ToastHost />
       <AiEdgeGlow active={isGenerating} />
     </div>
+  );
+}
+
+function App() {
+  const [showEditor, setShowEditor] = useState(false);
+  const transitionRef = useRef<PageTransitionHandle>(null);
+
+  const handleGetStarted = () => {
+    transitionRef.current?.play(() => setShowEditor(true));
+  };
+
+  return (
+    <>
+      {showEditor ? <Editor /> : <LandingPage onGetStarted={handleGetStarted} />}
+      <PageTransition ref={transitionRef} />
+    </>
   );
 }
 

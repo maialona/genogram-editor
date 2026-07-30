@@ -1,0 +1,24 @@
+.page-transition {
+  z-index: 500;
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  overflow: clip;
+}
+
+.page-transition__shape {
+  color: #3b82f6;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.page-transition__svg {
+  width: 130%;
+  height: 130%;
+  position: absolute;
+  top: -15%;
+  left: -15%;
+}
