@@ -1,6 +1,8 @@
 import { Network, Sparkles, Share2, ShieldCheck, ArrowRight } from "lucide-react";
 import "./LandingPage.css";
 
+const APP_VERSION = "0.1.0";
+
 interface LandingPageProps {
   onGetStarted: () => void;
 }
@@ -33,7 +35,10 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
     <div className="landing-page">
       <main className="landing-hero">
         <p className="landing-eyebrow">家庭關係譜圖編輯器</p>
-        <h1 className="landing-title">Open Family Map</h1>
+        <div className="landing-title-row">
+          <h1 className="landing-title">Open Family Map</h1>
+          <span className="landing-badge landing-badge-beta">Beta</span>
+        </div>
         <p className="landing-subtitle">
           為協助個人與家庭的專業工作者打造。輸入文字或手動繪製，AI
           協助生成結構正確、易讀易改的家系圖，讓你專注在關係本身。
@@ -59,7 +64,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       <footer className="landing-footer">
-        <span>Open Family Map</span>
+        <span>Open Family Map · v{APP_VERSION}</span>
         <span>&copy; 2026 Aolume</span>
       </footer>
     </div>

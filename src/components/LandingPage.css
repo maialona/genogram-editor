@@ -30,14 +30,74 @@
   color: #3b82f6;
 }
 
-.landing-title {
+.landing-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   margin: 0 0 18px;
+}
+
+.landing-title {
+  margin: 0;
   font-family: "Fredoka", var(--font-sans);
   font-size: clamp(36px, 6vw, 58px);
   line-height: 1.18;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: #17181c;
+  background: linear-gradient(
+    90deg,
+    #1d4ed8,
+    #3b82f6,
+    #67e8f9,
+    #3b82f6,
+    #1d4ed8
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: landing-title-gradient 6s ease-in-out infinite;
+}
+
+@keyframes landing-title-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-title {
+    animation: none;
+    background-position: 0% 50%;
+  }
+}
+
+.landing-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateY(2px);
+}
+
+.landing-badge-beta {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.28);
 }
 
 .landing-subtitle {
