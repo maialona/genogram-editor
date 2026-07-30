@@ -11,13 +11,22 @@ interface ChatCompletionResponse {
   error?: { message?: string; type?: string };
 }
 
+interface AnthropicMessagesResponse {
+  content?: Array<{ type: string; text?: string }>;
+  stop_reason?: string;
+  error?: { message?: string; type?: string };
+}
+
+const ANTHROPIC_VERSION = "2023-06-01";
+
 function resolveEndpoint(settings: AiSettings): string {
   const apiBase = settings.baseUrl.replace(/\/$/, "");
+  const path = settings.provider === "anthropic" ? "/v1/messages" : "/chat/completions";
   if (settings.useProxy) {
     // Path after /llm-proxy is forwarded; target is the API base (e.g. https://api.x.ai/v1)
-    return `/llm-proxy/chat/completions?target=${encodeURIComponent(apiBase)}`;
+    return `/llm-proxy${path}?target=${encodeURIComponent(apiBase)}`;
   }
-  return `${apiBase}/chat/completions`;
+  return `${apiBase}${path}`;
 }
 
 /**
@@ -44,28 +53,40 @@ export async function generateGenogramDraft(
     throw new AiClientError("empty", "請描述個案的家庭關係");
   }
 
+  const isAnthropic = settings.provider === "anthropic";
   const url = resolveEndpoint(settings);
+  const userContent = `請根據以下描述產生家系圖 JSON：\n\n${text}`;
   let response: Response;
 
   try {
     response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: settings.model,
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: buildSystemPrompt() },
-          {
-            role: "user",
-            content: `請根據以下描述產生家系圖 JSON：\n\n${text}`,
+      headers: isAnthropic
+        ? {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": ANTHROPIC_VERSION,
+          }
+        : {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
           },
-        ],
-      }),
+      body: isAnthropic
+        ? JSON.stringify({
+            model: settings.model,
+            max_tokens: 4096,
+            system: buildSystemPrompt(),
+            messages: [{ role: "user", content: userContent }],
+          })
+        : JSON.stringify({
+            model: settings.model,
+            temperature: 0.2,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: buildSystemPrompt() },
+              { role: "user", content: userContent },
+            ],
+          }),
       signal,
     });
   } catch (err) {
@@ -82,10 +103,12 @@ export async function generateGenogramDraft(
     throw new AiClientError("network", `網路錯誤：${msg}`);
   }
 
-  let body: ChatCompletionResponse | null = null;
+  let body: (ChatCompletionResponse & AnthropicMessagesResponse) | null = null;
   const rawText = await response.text();
   try {
-    body = rawText ? (JSON.parse(rawText) as ChatCompletionResponse) : null;
+    body = rawText
+      ? (JSON.parse(rawText) as ChatCompletionResponse & AnthropicMessagesResponse)
+      : null;
   } catch {
     body = null;
   }
@@ -126,7 +149,9 @@ export async function generateGenogramDraft(
     );
   }
 
-  const content = body?.choices?.[0]?.message?.content;
+  const content = isAnthropic
+    ? body?.content?.find((block) => block.type === "text")?.text
+    : body?.choices?.[0]?.message?.content;
   if (!content || !content.trim()) {
     throw new AiClientError("empty", "模型沒有回傳內容，請再試一次");
   }

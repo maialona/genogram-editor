@@ -14,6 +14,7 @@ const DEFAULT_ALLOWED_HOSTS = [
   "api.x.ai",
   "api.openai.com",
   "api.deepseek.com",
+  "api.anthropic.com",
 ];
 
 function getAllowedHosts() {
@@ -96,7 +97,7 @@ export default async function handler(req, res) {
       res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
       res.setHeader(
         "Access-Control-Allow-Headers",
-        "Authorization, Content-Type"
+        "Authorization, Content-Type, x-api-key, anthropic-version"
       );
       res.end();
       return;
@@ -127,6 +128,10 @@ export default async function handler(req, res) {
     const headers = { Accept: "application/json" };
     const auth = req.headers.authorization || req.headers.Authorization;
     if (auth) headers.Authorization = auth;
+    const apiKey = req.headers["x-api-key"];
+    if (apiKey) headers["x-api-key"] = apiKey;
+    const anthropicVersion = req.headers["anthropic-version"];
+    if (anthropicVersion) headers["anthropic-version"] = anthropicVersion;
     const contentType =
       req.headers["content-type"] || req.headers["Content-Type"];
     headers["Content-Type"] = contentType || "application/json";

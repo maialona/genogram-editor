@@ -29,13 +29,19 @@ export const PROVIDER_PRESETS: Record<
     defaultModel: "deepseek-v4-flash",
     models: ["deepseek-v4-flash", "deepseek-v4-pro"],
   },
+  anthropic: {
+    label: "Claude (Anthropic)",
+    baseUrl: "https://api.anthropic.com",
+    defaultModel: "claude-sonnet-5",
+    models: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5"],
+  },
 };
 
 const DEFAULT_SETTINGS: AiSettings = {
   apiKey: "",
-  provider: "deepseek",
-  baseUrl: PROVIDER_PRESETS.deepseek.baseUrl,
-  model: PROVIDER_PRESETS.deepseek.defaultModel,
+  provider: "openai",
+  baseUrl: PROVIDER_PRESETS.openai.baseUrl,
+  model: PROVIDER_PRESETS.openai.defaultModel,
   useProxy: true,
 };
 
@@ -47,10 +53,11 @@ function loadSettings(): AiSettings {
     const provider: AiProviderId =
       parsed.provider === "openai" ||
       parsed.provider === "deepseek" ||
+      parsed.provider === "anthropic" ||
       parsed.provider === "custom" ||
       parsed.provider === "xai"
         ? parsed.provider
-        : "deepseek";
+        : "openai";
 
     const preset =
       provider === "custom" ? null : PROVIDER_PRESETS[provider];

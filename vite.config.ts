@@ -59,6 +59,14 @@ function llmProxyPlugin(): Plugin {
       const headers: Record<string, string> = {};
       const auth = req.headers.authorization;
       if (auth) headers.Authorization = auth;
+      const apiKey = req.headers["x-api-key"];
+      if (apiKey) headers["x-api-key"] = Array.isArray(apiKey) ? apiKey[0] : apiKey;
+      const anthropicVersion = req.headers["anthropic-version"];
+      if (anthropicVersion) {
+        headers["anthropic-version"] = Array.isArray(anthropicVersion)
+          ? anthropicVersion[0]
+          : anthropicVersion;
+      }
       const contentType = req.headers["content-type"];
       if (contentType) headers["Content-Type"] = contentType;
       headers.Accept = "application/json";
