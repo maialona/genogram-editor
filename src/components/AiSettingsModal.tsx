@@ -94,7 +94,6 @@ export function AiSettingsModal({ open, onClose }: AiSettingsModalProps) {
 
         <p className="ai-settings-hint">
           API Key 只存在本機瀏覽器（localStorage），不會上傳到本專案伺服器。
-          開啟代理時：本機走 Vite、Vercel 走 serverless，再轉發到供應商（避免 CORS）。
         </p>
 
         <label className="ai-settings-field">
@@ -157,18 +156,6 @@ export function AiSettingsModal({ open, onClose }: AiSettingsModalProps) {
               placeholder="model-id"
             />
           )}
-        </label>
-
-        <label className="ai-settings-check">
-          <input
-            type="checkbox"
-            checked={useProxy}
-            onChange={(e) => setUseProxy(e.target.checked)}
-          />
-          <span>
-            使用代理（建議，避免 CORS；本機 <code>npm run dev</code> / Vercel
-            serverless）
-          </span>
         </label>
 
         <div className="ai-settings-actions">
