@@ -10,7 +10,7 @@ Professionals and individuals who translate family narratives into editable geno
 
 ## Product Purpose
 
-Turn written or manually entered family relationships into a clear, standards-aware genogram that remains easy to inspect and edit. Success means the diagram is structurally accurate, visually legible, and fast to refine after AI generation.
+Turn written or manually entered family relationships into a clear, standards-aware genogram that remains easy to inspect and edit. The same case can switch to an ecomap view to map the household against external systems. Success means the diagram is structurally accurate, visually legible, and fast to refine after AI generation.
 
 ## Brand Personality
 

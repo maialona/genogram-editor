@@ -1,5 +1,10 @@
-import { buildSystemPrompt } from "./systemPrompt";
+import {
+  extractEcomapHints,
+  inferDiagramIntent,
+  ensureEcomapDraft,
+} from "./diagramIntent";
 import { parseAiGenogramDraft } from "./parseAiResponse";
+import { buildSystemPrompt, buildUserContent } from "./systemPrompt";
 import type { AiGenerateResult, AiSettings } from "./types";
 import { AiClientError } from "./types";
 
@@ -50,12 +55,14 @@ export async function generateGenogramDraft(
 
   const text = description.trim();
   if (!text) {
-    throw new AiClientError("empty", "請描述個案的家庭關係");
+    throw new AiClientError("empty", "請描述個案的家庭關係或生態圖");
   }
 
   const isAnthropic = settings.provider === "anthropic";
   const url = resolveEndpoint(settings);
-  const userContent = `請根據以下描述產生家系圖 JSON：\n\n${text}`;
+  const intent = inferDiagramIntent(text);
+  const userContent = buildUserContent(text, intent, extractEcomapHints(text));
+  const systemPrompt = buildSystemPrompt(intent);
   let response: Response;
 
   try {
@@ -75,7 +82,7 @@ export async function generateGenogramDraft(
         ? JSON.stringify({
             model: settings.model,
             max_tokens: 4096,
-            system: buildSystemPrompt(),
+            system: systemPrompt,
             messages: [{ role: "user", content: userContent }],
           })
         : JSON.stringify({
@@ -83,7 +90,7 @@ export async function generateGenogramDraft(
             temperature: 0.2,
             response_format: { type: "json_object" },
             messages: [
-              { role: "system", content: buildSystemPrompt() },
+              { role: "system", content: systemPrompt },
               { role: "user", content: userContent },
             ],
           }),
@@ -156,6 +163,11 @@ export async function generateGenogramDraft(
     throw new AiClientError("empty", "模型沒有回傳內容，請再試一次");
   }
 
-  const { draft, warnings } = parseAiGenogramDraft(content);
-  return { draft, warnings, rawContent: content };
+  const parsed = parseAiGenogramDraft(content);
+  const ensured = ensureEcomapDraft(parsed.draft, text);
+  return {
+    draft: ensured.draft,
+    warnings: [...parsed.warnings, ...ensured.warnings],
+    rawContent: content,
+  };
 }

@@ -4,14 +4,24 @@ import {
   buildFamilyUnits,
   layoutFamilyUnit,
 } from "../../src/renderers/familyUnits";
-import { createPerson, type Document } from "../../src/types/document";
+import {
+  createEmptyDocument,
+  createPerson,
+  type Document,
+} from "../../src/types/document";
 
 function person(id: string, name: string, x: number, y: number) {
   return createPerson({ id, name, gender: "unknown", x, y });
 }
 
+function doc(
+  partial: Pick<Document, "title" | "persons" | "relationships">
+): Document {
+  return { ...createEmptyDocument(), ...partial, updatedAt: 0 };
+}
+
 test("children belong only to the couple that shares both parent links", () => {
-  const document: Document = {
+  const document = doc({
     title: "再婚家庭",
     persons: [
       person("mother", "林雅玲", 300, 200),
@@ -33,10 +43,7 @@ test("children belong only to the couple that shares both parent links", () => {
       { id: "mother-son", from: "mother", to: "son", type: "parent" },
       { id: "current-son", from: "current", to: "son", type: "parent" },
     ],
-    annotations: [],
-    viewport: { scale: 1, offsetX: 0, offsetY: 0 },
-    updatedAt: 0,
-  };
+  });
 
   const { units } = buildFamilyUnits(document);
   const oldFamily = units.find((unit) => unit.coupleRel?.id === "old-couple");
@@ -49,7 +56,7 @@ test("children belong only to the couple that shares both parent links", () => {
 });
 
 test("twins share one branch junction instead of separate vertical drops", () => {
-  const document: Document = {
+  const document = doc({
     title: "雙胞胎家庭",
     persons: [
       person("father", "林建宏", 200, 200),
@@ -70,10 +77,7 @@ test("twins share one branch junction instead of separate vertical drops", () =>
       { id: "fb", from: "father", to: "twin-b", type: "parent" },
       { id: "mb", from: "mother", to: "twin-b", type: "parent" },
     ],
-    annotations: [],
-    viewport: { scale: 1, offsetX: 0, offsetY: 0 },
-    updatedAt: 0,
-  };
+  });
 
   const unit = buildFamilyUnits(document).units[0];
   const layout = layoutFamilyUnit(unit) as ReturnType<typeof layoutFamilyUnit> & {
@@ -92,7 +96,7 @@ test("twins share one branch junction instead of separate vertical drops", () =>
 });
 
 test("adoptive parent links mark the child drop as adoptive", () => {
-  const document: Document = {
+  const document = doc({
     title: "收養家庭",
     persons: [
       person("father", "林建志", 200, 200),
@@ -116,10 +120,7 @@ test("adoptive parent links mark the child drop as adoptive", () => {
         meta: { parentKind: "adoptive" },
       },
     ],
-    annotations: [],
-    viewport: { scale: 1, offsetX: 0, offsetY: 0 },
-    updatedAt: 0,
-  };
+  });
 
   const unit = buildFamilyUnits(document).units[0];
   const layout = layoutFamilyUnit(unit) as ReturnType<typeof layoutFamilyUnit> & {
@@ -130,7 +131,7 @@ test("adoptive parent links mark the child drop as adoptive", () => {
 });
 
 test("manual adoptive-parent relationships join a child to the family unit", () => {
-  const document: Document = {
+  const document = doc({
     title: "手動收養",
     persons: [
       person("father", "林建志", 200, 200),
@@ -152,10 +153,7 @@ test("manual adoptive-parent relationships join a child to the family unit", () 
         type: "adoptiveParent" as never,
       },
     ],
-    annotations: [],
-    viewport: { scale: 1, offsetX: 0, offsetY: 0 },
-    updatedAt: 0,
-  };
+  });
 
   const unit = buildFamilyUnits(document).units[0];
   assert.deepEqual(unit.children.map((child) => child.name), ["林子恩"]);
@@ -163,7 +161,7 @@ test("manual adoptive-parent relationships join a child to the family unit", () 
 });
 
 test("manual twin relationship creates a shared twin junction", () => {
-  const document: Document = {
+  const document = doc({
     title: "手動雙胞胎",
     persons: [
       person("father", "林建宏", 200, 200),
@@ -179,10 +177,7 @@ test("manual twin relationship creates a shared twin junction", () => {
       { id: "mb", from: "mother", to: "twin-b", type: "parent" },
       { id: "twins", from: "twin-a", to: "twin-b", type: "twin" as never },
     ],
-    annotations: [],
-    viewport: { scale: 1, offsetX: 0, offsetY: 0 },
-    updatedAt: 0,
-  };
+  });
 
   const result = buildFamilyUnits(document);
   const layout = layoutFamilyUnit(result.units[0]);

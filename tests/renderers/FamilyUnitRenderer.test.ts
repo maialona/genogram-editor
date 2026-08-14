@@ -7,11 +7,15 @@ import {
   buildFamilyUnits,
   layoutFamilyUnit,
 } from "../../src/renderers/familyUnits";
-import { createPerson, type Document } from "../../src/types/document";
+import {
+  createEmptyDocument,
+  createPerson,
+} from "../../src/types/document";
 
 test("adoption renders a solid biological line beside a dashed line", () => {
   (globalThis as typeof globalThis & { React: typeof React }).React = React;
-  const document: Document = {
+  const document = {
+    ...createEmptyDocument(),
     title: "收養圖例",
     persons: [
       createPerson({ id: "a", gender: "male", x: 100, y: 100 }),

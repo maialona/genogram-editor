@@ -73,6 +73,49 @@ export type RelationshipType =
 /** Extensible metadata bag for future fields without changing core structure. */
 export type ExtensibleMeta = Record<string, string | number | boolean | null>;
 
+export type DiagramMode = "genogram" | "ecomap";
+
+export type EcoSystemCategory =
+  | "school"
+  | "work"
+  | "religion"
+  | "friends"
+  | "health"
+  | "socialService"
+  | "recreation"
+  | "legal"
+  | "community"
+  | "extendedFamily"
+  | "custom";
+
+export type EcoLinkStrength = "strong" | "moderate" | "weak";
+export type EcoLinkQuality = "supportive" | "stressful" | "mixed" | "cutoff";
+export type EcoLinkFlow = "none" | "inward" | "outward" | "both";
+
+/** Who an eco-link attaches to on the family side. */
+export type EcoLinkEndpoint =
+  | { kind: "household" }
+  | { kind: "person"; personId: string };
+
+export interface EcoSystem {
+  id: string;
+  label: string;
+  category: EcoSystemCategory;
+  notes: string;
+  x: number;
+  y: number;
+}
+
+export interface EcoLink {
+  id: string;
+  from: EcoLinkEndpoint;
+  to: string;
+  strength: EcoLinkStrength;
+  quality: EcoLinkQuality;
+  flow: EcoLinkFlow;
+  notes: string;
+}
+
 export interface Person {
   id: string;
   gender: Gender;
@@ -87,6 +130,9 @@ export interface Person {
   notes: string;
   x: number;
   y: number;
+  /** Independent ecomap-view coordinates; null until the layout is seeded. */
+  ecomapX: number | null;
+  ecomapY: number | null;
   rotation: number;
   sexuality: Sexuality;
   transgender: Transgender;
@@ -127,9 +173,15 @@ export interface Document {
   relationships: Relationship[];
   annotations: Annotation[];
   viewport: Viewport;
+  /** Core-family members drawn inside the ecomap household circle. */
+  householdPersonIds: string[];
+  ecoSystems: EcoSystem[];
+  ecoLinks: EcoLink[];
+  /** Independent pan/zoom for the ecomap view. */
+  ecomapViewport: Viewport;
   /** Unix ms of last content change (client clock). */
   updatedAt: number;
-  /** Document-level extensibility (schemaVersion, etc.). */
+  /** Document-level extensibility (schemaVersion, diagramMode, etc.). */
   meta?: ExtensibleMeta;
 }
 
@@ -169,6 +221,10 @@ export function createEmptyDocument(): Document {
     relationships: [],
     annotations: [],
     viewport: { ...DEFAULT_VIEWPORT },
+    householdPersonIds: [],
+    ecoSystems: [],
+    ecoLinks: [],
+    ecomapViewport: { ...DEFAULT_VIEWPORT },
     updatedAt: Date.now(),
   };
 }
@@ -185,6 +241,8 @@ export function createPerson(
     indexPerson: false,
     medicalConditions: [],
     notes: "",
+    ecomapX: null,
+    ecomapY: null,
     rotation: 0,
     sexuality: "none",
     transgender: "none",
@@ -199,4 +257,27 @@ export function createRelationship(
     Partial<Relationship>
 ): Relationship {
   return { ...partial };
+}
+
+export function createEcoSystem(
+  partial: Pick<EcoSystem, "id" | "x" | "y"> & Partial<EcoSystem>
+): EcoSystem {
+  return {
+    label: "",
+    category: "custom",
+    notes: "",
+    ...partial,
+  };
+}
+
+export function createEcoLink(
+  partial: Pick<EcoLink, "id" | "from" | "to"> & Partial<EcoLink>
+): EcoLink {
+  return {
+    strength: "moderate",
+    quality: "supportive",
+    flow: "none",
+    notes: "",
+    ...partial,
+  };
 }

@@ -1261,6 +1261,56 @@
   flex-shrink: 0;
 }
 
+.diagram-mode-switch {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.diagram-mode-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #a1a1aa;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.diagram-mode-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f4f5;
+}
+
+.diagram-mode-btn:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+
+.ecomap-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px;
+}
+
+.symbol-label small {
+  display: block;
+  font-size: 10px;
+  opacity: 0.65;
+  font-weight: 400;
+}
+
 .canvas-tool {
   appearance: none;
   display: inline-flex;

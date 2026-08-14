@@ -1,9 +1,20 @@
 import { v4 as uuidv4 } from "uuid";
 import {
+  householdCircle,
+  HOUSEHOLD_MIN_RADIUS,
+  placeSystemsAroundHousehold,
+  seedEcomapLayout,
+} from "../renderers/ecomapLayout";
+import {
+  createEmptyDocument,
+  createEcoLink,
+  createEcoSystem,
   createPerson,
   createRelationship,
   DEFAULT_DOCUMENT_TITLE,
   type Document,
+  type EcoLink,
+  type EcoSystem,
   type Person,
   type Relationship,
 } from "../types/document";
@@ -341,13 +352,113 @@ export function layoutGenogram(draft: AiGenogramDraft): Document {
       ? draft.title.trim().slice(0, 120)
       : DEFAULT_DOCUMENT_TITLE;
 
-  return {
+  const isEcomap =
+    draft.diagramMode === "ecomap" ||
+    (draft.ecoSystems?.length ?? 0) > 0 ||
+    (draft.ecoLinks?.length ?? 0) > 0;
+
+  if (!isEcomap) {
+    return {
+      ...createEmptyDocument(),
+      title,
+      persons,
+      relationships,
+      annotations: [],
+      viewport: { scale: 1, offsetX: 0, offsetY: 0 },
+      updatedAt: Date.now(),
+      meta: { source: "ai-genogram", generatedAt: Date.now() },
+    };
+  }
+
+  return layoutEcomapFromDraft(draft, {
     title,
     persons,
     relationships,
+    idMap,
+  });
+}
+
+function layoutEcomapFromDraft(
+  draft: AiGenogramDraft,
+  laidOut: {
+    title: string;
+    persons: Person[];
+    relationships: Relationship[];
+    idMap: Map<string, string>;
+  }
+): Document {
+  const householdPersonIds = (draft.householdPersonIds ?? [])
+    .map((id) => laidOut.idMap.get(id))
+    .filter((id): id is string => Boolean(id));
+
+  const seeded = seedEcomapLayout({
+    ...createEmptyDocument(),
+    title: laidOut.title,
+    persons: laidOut.persons,
+    relationships: laidOut.relationships,
+    householdPersonIds,
+  });
+
+  const circle = householdCircle(seeded) ?? {
+    cx: 0,
+    cy: 0,
+    r: HOUSEHOLD_MIN_RADIUS,
+  };
+  const systems = draft.ecoSystems ?? [];
+  const points = placeSystemsAroundHousehold(circle, systems.length);
+  const systemIdMap = new Map<string, string>();
+  const ecoSystems: EcoSystem[] = systems.map((system, index) => {
+    const newId = uuidv4();
+    systemIdMap.set(system.id, newId);
+    const pos = points[index] ?? { x: circle.cx, y: circle.cy - circle.r - 80 };
+    return createEcoSystem({
+      id: newId,
+      label: system.label,
+      category: system.category,
+      notes: system.notes ?? "",
+      x: pos.x,
+      y: pos.y,
+    });
+  });
+
+  const ecoLinks: EcoLink[] = [];
+  for (const link of draft.ecoLinks ?? []) {
+    const to = systemIdMap.get(link.to);
+    if (!to) continue;
+    const from =
+      link.from.kind === "household"
+        ? ({ kind: "household" } as const)
+        : laidOut.idMap.has(link.from.personId)
+          ? ({
+              kind: "person" as const,
+              personId: laidOut.idMap.get(link.from.personId)!,
+            })
+          : null;
+    if (!from) continue;
+    ecoLinks.push(
+      createEcoLink({
+        id: uuidv4(),
+        from,
+        to,
+        strength: link.strength ?? "moderate",
+        quality: link.quality ?? "supportive",
+        flow: link.flow ?? "none",
+        notes: link.notes ?? "",
+      })
+    );
+  }
+
+  return {
+    ...seeded,
+    ecoSystems,
+    ecoLinks,
     annotations: [],
     viewport: { scale: 1, offsetX: 0, offsetY: 0 },
     updatedAt: Date.now(),
-    meta: { source: "ai-genogram", generatedAt: Date.now() },
+    meta: {
+      source: "ai-ecomap",
+      generatedAt: Date.now(),
+      diagramMode: "ecomap",
+    },
   };
 }

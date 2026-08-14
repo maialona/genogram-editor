@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useDocumentStore } from "../store/documentStore";
 import { createSampleGenogram } from "../data/sampleGenogram";
+import { createSampleEcomap } from "../data/sampleEcomap";
 import {
   exportJson,
   exportPng,
@@ -135,23 +136,35 @@ export function Toolbar({ onLogoClick }: ToolbarProps) {
     newDocument();
   };
 
+  const diagramMode = useDocumentStore((s) => s.diagramMode);
+
   const handleSample = () => {
+    const ecomap = diagramMode === "ecomap";
     if (
       !confirmIfDirty(
-        "載入示範家系圖？（會覆蓋目前畫布，可用復原還原）"
+        ecomap
+          ? "載入示範生態圖？（會覆蓋目前畫布，可用復原還原）"
+          : "載入示範家系圖？（會覆蓋目前畫布，可用復原還原）"
       )
     ) {
       return;
     }
-    loadDocumentData(createSampleGenogram());
+    loadDocumentData(ecomap ? createSampleEcomap() : createSampleGenogram());
     requestFitToContent();
-    showToast("已載入示範家系圖", { tone: "success", durationMs: 2500 });
+    showToast(ecomap ? "已載入示範生態圖" : "已載入示範家系圖", {
+      tone: "success",
+      durationMs: 2500,
+    });
   };
 
   const handleExport = async (format: ExportFormat) => {
     setExportOpen(false);
-    if (format !== "json" && document.persons.length === 0) {
-      showToast("畫布是空的，請先新增人物再匯出", { tone: "error" });
+    if (
+      format !== "json" &&
+      document.persons.length === 0 &&
+      document.ecoSystems.length === 0
+    ) {
+      showToast("畫布是空的，請先新增內容再匯出", { tone: "error" });
       return;
     }
     setExporting(true);
@@ -247,12 +260,12 @@ export function Toolbar({ onLogoClick }: ToolbarProps) {
             <FilePlus2 {...ICON} />
           </button>
         </span>
-        <span className="icon-tooltip" data-tooltip="載入示範家系圖">
+        <span className="icon-tooltip" data-tooltip={diagramMode === "ecomap" ? "載入示範生態圖" : "載入示範家系圖"}>
           <button
             type="button"
             className="toolbar-icon-btn"
             onClick={handleSample}
-            aria-label="載入示範家系圖"
+            aria-label={diagramMode === "ecomap" ? "載入示範生態圖" : "載入示範家系圖"}
           >
             <Network {...ICON} />
           </button>

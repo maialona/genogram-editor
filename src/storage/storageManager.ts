@@ -1,6 +1,13 @@
 import type {
   CulturalMark,
   Document,
+  EcoLink,
+  EcoLinkEndpoint,
+  EcoLinkFlow,
+  EcoLinkQuality,
+  EcoLinkStrength,
+  EcoSystem,
+  EcoSystemCategory,
   Gender,
   Person,
   Relationship,
@@ -11,10 +18,13 @@ import type {
 } from "../types/document";
 import {
   createEmptyDocument,
+  createEcoLink,
+  createEcoSystem,
   createPerson,
   DEFAULT_DOCUMENT_TITLE,
 } from "../types/document";
 import { RELATIONSHIP_LABELS } from "../types/relationshipCatalog";
+import { ECO_SYSTEM_LABELS } from "../types/ecomapCatalog";
 
 const STORAGE_KEY = "genogram-editor-document-v1";
 
@@ -130,7 +140,73 @@ function normalizePerson(raw: Partial<Person> & { id?: string }): Person | null 
     transgender: normalizeTrans(raw.transgender),
     specialType: normalizeSpecial(raw.specialType),
     culturalMark: normalizeCulture(raw.culturalMark),
+    ecomapX: typeof raw.ecomapX === "number" ? raw.ecomapX : null,
+    ecomapY: typeof raw.ecomapY === "number" ? raw.ecomapY : null,
     meta: raw.meta,
+  });
+}
+
+const VALID_ECO_CATEGORIES = new Set(Object.keys(ECO_SYSTEM_LABELS));
+const VALID_STRENGTHS = new Set<EcoLinkStrength>([
+  "strong",
+  "moderate",
+  "weak",
+]);
+const VALID_QUALITIES = new Set<EcoLinkQuality>([
+  "supportive",
+  "stressful",
+  "mixed",
+  "cutoff",
+]);
+const VALID_FLOWS = new Set<EcoLinkFlow>(["none", "inward", "outward", "both"]);
+
+function normalizeEcoSystem(
+  raw: Partial<EcoSystem> & { id?: string }
+): EcoSystem | null {
+  if (!raw.id || typeof raw.x !== "number" || typeof raw.y !== "number") {
+    return null;
+  }
+  const category = VALID_ECO_CATEGORIES.has(raw.category as string)
+    ? (raw.category as EcoSystemCategory)
+    : "custom";
+  return createEcoSystem({
+    id: raw.id,
+    x: raw.x,
+    y: raw.y,
+    label: typeof raw.label === "string" ? raw.label : "",
+    category,
+    notes: typeof raw.notes === "string" ? raw.notes : "",
+  });
+}
+
+function normalizeEcoLinkEndpoint(raw: unknown): EcoLinkEndpoint | null {
+  if (!raw || typeof raw !== "object") return null;
+  const endpoint = raw as Partial<EcoLinkEndpoint> & { personId?: string };
+  if (endpoint.kind === "household") return { kind: "household" };
+  if (endpoint.kind === "person" && typeof endpoint.personId === "string") {
+    return { kind: "person", personId: endpoint.personId };
+  }
+  return null;
+}
+
+function normalizeEcoLink(raw: Partial<EcoLink> & { id?: string }): EcoLink | null {
+  if (!raw.id || typeof raw.to !== "string") return null;
+  const from = normalizeEcoLinkEndpoint(raw.from);
+  if (!from) return null;
+  return createEcoLink({
+    id: raw.id,
+    from,
+    to: raw.to,
+    strength: VALID_STRENGTHS.has(raw.strength as EcoLinkStrength)
+      ? (raw.strength as EcoLinkStrength)
+      : "moderate",
+    quality: VALID_QUALITIES.has(raw.quality as EcoLinkQuality)
+      ? (raw.quality as EcoLinkQuality)
+      : "supportive",
+    flow: VALID_FLOWS.has(raw.flow as EcoLinkFlow)
+      ? (raw.flow as EcoLinkFlow)
+      : "none",
+    notes: typeof raw.notes === "string" ? raw.notes : "",
   });
 }
 
@@ -169,6 +245,37 @@ export function normalizeDocument(input: Partial<Document>): Document {
         .filter((r): r is Relationship => r != null)
     : empty.relationships;
 
+  const personIds = new Set(persons.map((p) => p.id));
+
+  const ecoSystems = Array.isArray(input.ecoSystems)
+    ? input.ecoSystems
+        .map((s) => normalizeEcoSystem(s as Partial<EcoSystem>))
+        .filter((s): s is EcoSystem => s != null)
+    : empty.ecoSystems;
+  const systemIds = new Set(ecoSystems.map((s) => s.id));
+
+  const ecoLinks = (
+    Array.isArray(input.ecoLinks)
+      ? input.ecoLinks
+          .map((l) => normalizeEcoLink(l as Partial<EcoLink>))
+          .filter((l): l is EcoLink => l != null)
+      : empty.ecoLinks
+  ).filter((link) => {
+    if (!systemIds.has(link.to)) return false;
+    if (link.from.kind === "person" && !personIds.has(link.from.personId)) {
+      return false;
+    }
+    return true;
+  });
+
+  const householdPersonIds = (
+    Array.isArray(input.householdPersonIds)
+      ? input.householdPersonIds.filter(
+          (id): id is string => typeof id === "string" && personIds.has(id)
+        )
+      : empty.householdPersonIds
+  ).filter((id, index, all) => all.indexOf(id) === index);
+
   return {
     title: normalizeTitle(input.title, input.meta),
     persons,
@@ -180,6 +287,14 @@ export function normalizeDocument(input: Partial<Document>): Document {
       scale: input.viewport?.scale ?? empty.viewport.scale,
       offsetX: input.viewport?.offsetX ?? empty.viewport.offsetX,
       offsetY: input.viewport?.offsetY ?? empty.viewport.offsetY,
+    },
+    householdPersonIds,
+    ecoSystems,
+    ecoLinks,
+    ecomapViewport: {
+      scale: input.ecomapViewport?.scale ?? empty.ecomapViewport.scale,
+      offsetX: input.ecomapViewport?.offsetX ?? empty.ecomapViewport.offsetX,
+      offsetY: input.ecomapViewport?.offsetY ?? empty.ecomapViewport.offsetY,
     },
     updatedAt:
       typeof input.updatedAt === "number" && Number.isFinite(input.updatedAt)

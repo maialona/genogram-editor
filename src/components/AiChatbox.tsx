@@ -21,7 +21,7 @@ const PHASE_LABELS: Partial<Record<AiGenerationPhase, string>> = {
   analyzing: "理解描述",
   structuring: "整理人物",
   linking: "建立關係",
-  revealing: "生成家系圖",
+  revealing: "生成圖譜",
 };
 
 export function AiGenerationStatus({
@@ -131,7 +131,7 @@ export function AiChatbox() {
 
     if (hasContent()) {
       const ok = window.confirm(
-        "將以 AI 產生的家系圖取代目前畫布內容（可按 Ctrl+Z 復原）。確定繼續？"
+        "將以 AI 產生的圖譜取代目前畫布內容（可按 Ctrl+Z 復原）。確定繼續？"
       );
       if (!ok) return;
     }
@@ -165,7 +165,12 @@ export function AiChatbox() {
 
           const n = nextDocument.persons.length;
           const m = nextDocument.relationships.length;
-          showToast(`已產生 ${n} 人 · ${m} 條關係`, {
+          const systems = nextDocument.ecoSystems.length;
+          const toast =
+            nextDocument.meta?.diagramMode === "ecomap"
+              ? `已產生生態圖 ${n} 人 · ${systems} 個系統`
+              : `已產生 ${n} 人 · ${m} 條關係`;
+          showToast(toast, {
             tone: "success",
             durationMs: 3200,
           });
@@ -188,7 +193,7 @@ export function AiChatbox() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : "產生家系圖時發生未知錯誤";
+            : "產生圖譜時發生未知錯誤";
       setInput(submittedTextRef.current);
       fail(runId, message);
       if (
@@ -217,7 +222,7 @@ export function AiChatbox() {
   };
 
   return (
-    <div className="ai-chatbox-dock" aria-label="AI 家系圖產生">
+    <div className="ai-chatbox-dock" aria-label="AI 圖譜產生">
       <AiGenerationStatus
         phase={phase}
         error={error}
@@ -226,7 +231,7 @@ export function AiChatbox() {
 
       <div className={getAiChatboxClassName(busy)}>
         <label className="sr-only" htmlFor="ai-chat-input">
-          描述個案家庭關係
+          描述個案家庭關係或生態圖
         </label>
         <textarea
           id="ai-chat-input"
@@ -236,7 +241,11 @@ export function AiChatbox() {
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={busy ? "AI 正在建立家系圖…" : "描述個案家庭關係，AI 將產生家系圖…"}
+          placeholder={
+            busy
+              ? "AI 正在建立圖譜…"
+              : "描述家庭關係或生態圖，AI 將產生圖譜…"
+          }
           disabled={busy}
         />
 
@@ -269,8 +278,8 @@ export function AiChatbox() {
             <button
               type="button"
               className={`ai-send-btn${busy ? " cancel" : canSend ? " ready" : ""}`}
-              title={busy ? "停止產生" : "產生家系圖"}
-              aria-label={busy ? "停止產生" : "產生家系圖"}
+              title={busy ? "停止產生" : "產生圖譜"}
+              aria-label={busy ? "停止產生" : "產生圖譜"}
               disabled={!busy && !canSend}
               onClick={busy ? cancelGeneration : () => void send()}
             >

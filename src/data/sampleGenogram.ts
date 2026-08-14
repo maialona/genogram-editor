@@ -1,4 +1,8 @@
-import { createPerson, type Document } from "../types/document";
+import {
+  createEmptyDocument,
+  createPerson,
+  type Document,
+} from "../types/document";
 
 /**
  * 對應 simple-genogram-example.png 的示範家系圖。
@@ -40,6 +44,7 @@ export function createSampleGenogram(): Document {
   };
 
   return {
+    ...createEmptyDocument(),
     title: "Untitled",
     persons: [
       createPerson({

@@ -3,7 +3,10 @@ import test from "node:test";
 import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AiConstellationOverlay } from "../../src/components/Canvas/AiConstellationOverlay";
-import { createPerson, type Document } from "../../src/types/document";
+import {
+  createEmptyDocument,
+  createPerson,
+} from "../../src/types/document";
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
@@ -22,7 +25,8 @@ test("waiting constellation always renders six abstract nodes", () => {
 });
 
 test("revealing constellation renders the real preview document", () => {
-  const preview: Document = {
+  const preview = {
+    ...createEmptyDocument(),
     title: "preview",
     persons: [
       createPerson({
@@ -33,9 +37,6 @@ test("revealing constellation renders the real preview document", () => {
         y: 100,
       }),
     ],
-    relationships: [],
-    annotations: [],
-    viewport: { scale: 1, offsetX: 0, offsetY: 0 },
     updatedAt: 0,
   };
   const markup = renderToStaticMarkup(

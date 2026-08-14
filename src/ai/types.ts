@@ -1,4 +1,12 @@
-import type { Gender, RelationshipType } from "../types/document";
+import type {
+  DiagramMode,
+  EcoLinkFlow,
+  EcoLinkQuality,
+  EcoLinkStrength,
+  EcoSystemCategory,
+  Gender,
+  RelationshipType,
+} from "../types/document";
 
 export type AiProviderId = "xai" | "openai" | "deepseek" | "anthropic" | "custom";
 
@@ -35,12 +43,38 @@ export interface AiRelationshipDraft {
   parentKind?: "biological" | "adoptive";
 }
 
+export interface AiEcoSystemDraft {
+  id: string;
+  label: string;
+  category: EcoSystemCategory;
+  notes?: string;
+}
+
+/** Family-side endpoint: the household circle, or one person. */
+export type AiEcoLinkFromDraft =
+  | { kind: "household" }
+  | { kind: "person"; personId: string };
+
+export interface AiEcoLinkDraft {
+  from: AiEcoLinkFromDraft;
+  to: string;
+  strength?: EcoLinkStrength;
+  quality?: EcoLinkQuality;
+  flow?: EcoLinkFlow;
+  notes?: string;
+}
+
 /** Structured payload expected from the model (no pixel coordinates). */
 export interface AiGenogramDraft {
   title?: string;
   summary?: string;
+  /** Omitted or "genogram" keeps the family chart; "ecomap" opens the ecomap view. */
+  diagramMode?: DiagramMode;
   persons: AiPersonDraft[];
   relationships: AiRelationshipDraft[];
+  householdPersonIds?: string[];
+  ecoSystems?: AiEcoSystemDraft[];
+  ecoLinks?: AiEcoLinkDraft[];
 }
 
 export interface AiGenerateResult {

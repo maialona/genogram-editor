@@ -9,7 +9,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import { useDocumentStore } from "../store/documentStore";
-import type { RelationshipType } from "../types/document";
+import type { DiagramMode, RelationshipType } from "../types/document";
 import { ALL_REL_OPTIONS } from "../types/relationshipCatalog";
 
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
@@ -28,7 +28,11 @@ export function CanvasToolbar() {
   const setPendingRelationshipType = useDocumentStore(
     (s) => s.setPendingRelationshipType
   );
-  const viewport = useDocumentStore((s) => s.document.viewport);
+  const diagramMode = useDocumentStore((s) => s.diagramMode);
+  const setDiagramMode = useDocumentStore((s) => s.setDiagramMode);
+  const viewport = useDocumentStore((s) =>
+    s.diagramMode === "ecomap" ? s.document.ecomapViewport : s.document.viewport
+  );
   const setViewport = useDocumentStore((s) => s.setViewport);
 
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -151,6 +155,30 @@ export function CanvasToolbar() {
           >
             <Waypoints {...ICON} />
           </button>
+        </div>
+
+        <div className="canvas-toolbar-divider" aria-hidden="true" />
+
+        <div
+          className="diagram-mode-switch"
+          role="group"
+          aria-label="圖表類型"
+        >
+          {(["genogram", "ecomap"] as DiagramMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className={
+                diagramMode === mode
+                  ? "diagram-mode-btn active"
+                  : "diagram-mode-btn"
+              }
+              aria-pressed={diagramMode === mode}
+              onClick={() => setDiagramMode(mode)}
+            >
+              {mode === "genogram" ? "家系圖" : "生態圖"}
+            </button>
+          ))}
         </div>
 
         <div className="canvas-toolbar-divider" aria-hidden="true" />

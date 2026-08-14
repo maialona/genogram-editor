@@ -2,6 +2,9 @@ import { useRef } from "react";
 import { useDocumentStore } from "../store/documentStore";
 import type {
   CulturalMark,
+  EcoLink,
+  EcoSystem,
+  EcoSystemCategory,
   Gender,
   Person,
   Relationship,
@@ -12,6 +15,13 @@ import type {
 } from "../types/document";
 import { ALL_REL_OPTIONS } from "../types/relationshipCatalog";
 import { MEDICAL_MARKERS } from "../types/medicalCatalog";
+import {
+  ECO_FLOW_OPTIONS,
+  ECO_QUALITY_OPTIONS,
+  ECO_STRENGTH_OPTIONS,
+  ECO_SYSTEM_PRESETS,
+  HOUSEHOLD_ID,
+} from "../types/ecomapCatalog";
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: "male", label: "男性" },
@@ -74,6 +84,10 @@ function useHistoryOnce() {
 
 function PersonProperties({ person }: { person: Person }) {
   const updatePerson = useDocumentStore((s) => s.updatePerson);
+  const toggleHouseholdMember = useDocumentStore((s) => s.toggleHouseholdMember);
+  const inHousehold = useDocumentStore((s) =>
+    s.document.householdPersonIds.includes(person.id)
+  );
   const history = useHistoryOnce();
 
   const set = <K extends keyof Person>(key: K, value: Person[K]) => {
@@ -297,6 +311,164 @@ function PersonProperties({ person }: { person: Person }) {
           onChange={(e) => set("notes", e.target.value)}
         />
       </label>
+
+      <label className="prop-check">
+        <input
+          type="checkbox"
+          checked={inHousehold}
+          onChange={() => toggleHouseholdMember(person.id)}
+        />
+        <span>在核心家庭圈內</span>
+      </label>
+    </div>
+  );
+}
+
+function EcoSystemProperties({ system }: { system: EcoSystem }) {
+  const updateEcoSystem = useDocumentStore((s) => s.updateEcoSystem);
+  const history = useHistoryOnce();
+
+  return (
+    <div className="prop-form">
+      <h3 className="prop-section-title">系統屬性</h3>
+      <label className="prop-field">
+        <span>名稱</span>
+        <input
+          type="text"
+          value={system.label}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            updateEcoSystem(system.id, { label: e.target.value }, {
+              recordHistory: false,
+            })
+          }
+        />
+      </label>
+      <label className="prop-field">
+        <span>類別</span>
+        <select
+          value={system.category}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            updateEcoSystem(system.id, {
+              category: e.target.value as EcoSystemCategory,
+            })
+          }
+        >
+          {ECO_SYSTEM_PRESETS.map((o) => (
+            <option key={o.category} value={o.category}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="prop-field">
+        <span>備註</span>
+        <textarea
+          rows={3}
+          value={system.notes}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            updateEcoSystem(system.id, { notes: e.target.value }, {
+              recordHistory: false,
+            })
+          }
+        />
+      </label>
+    </div>
+  );
+}
+
+function EcoLinkProperties({ link }: { link: EcoLink }) {
+  const updateEcoLink = useDocumentStore((s) => s.updateEcoLink);
+  const document = useDocumentStore((s) => s.document);
+  const history = useHistoryOnce();
+  const system = document.ecoSystems.find((s) => s.id === link.to);
+  const fromLabel =
+    link.from.kind === "household"
+      ? "核心家庭"
+      : document.persons.find((p) =>
+          link.from.kind === "person" ? p.id === link.from.personId : false
+        )?.name || "人物";
+
+  return (
+    <div className="prop-form">
+      <h3 className="prop-section-title">生態連結</h3>
+      <div className="prop-readonly">
+        <span>從</span>
+        <strong>{fromLabel}</strong>
+      </div>
+      <div className="prop-readonly">
+        <span>至</span>
+        <strong>{system?.label || "系統"}</strong>
+      </div>
+      <label className="prop-field">
+        <span>強度</span>
+        <select
+          value={link.strength}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            updateEcoLink(link.id, {
+              strength: e.target.value as typeof link.strength,
+            })
+          }
+        >
+          {ECO_STRENGTH_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="prop-field">
+        <span>品質</span>
+        <select
+          value={link.quality}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            updateEcoLink(link.id, {
+              quality: e.target.value as typeof link.quality,
+            })
+          }
+        >
+          {ECO_QUALITY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="prop-field">
+        <span>流向</span>
+        <select
+          value={link.flow}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            updateEcoLink(link.id, {
+              flow: e.target.value as typeof link.flow,
+            })
+          }
+        >
+          {ECO_FLOW_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="prop-field">
+        <span>備註</span>
+        <textarea
+          rows={3}
+          value={link.notes}
+          onFocus={history.onFocus}
+          onChange={(e) =>
+            updateEcoLink(link.id, { notes: e.target.value }, {
+              recordHistory: false,
+            })
+          }
+        />
+      </label>
     </div>
   );
 }
@@ -398,6 +570,13 @@ export function PropertyPanel() {
   const selectedRels = document.relationships.filter((r) =>
     selectedIds.includes(r.id)
   );
+  const selectedSystems = document.ecoSystems.filter((s) =>
+    selectedIds.includes(s.id)
+  );
+  const selectedEcoLinks = document.ecoLinks.filter((l) =>
+    selectedIds.includes(l.id)
+  );
+  const householdSelected = selectedIds.includes(HOUSEHOLD_ID);
 
   return (
     <aside
@@ -414,9 +593,23 @@ export function PropertyPanel() {
               選取畫布上的物件以編輯屬性
             </p>
             <p className="prop-hint muted">
-              拉線：左側點「婚姻」→ 從人物 <strong>拖到</strong> 另一人物
+              家系圖拉線：左側點關係 → 從人物拖到另一人物。生態圖：把系統拖到畫布，再從家庭圈或人物拉到系統。
             </p>
           </div>
+        )}
+
+        {householdSelected &&
+          selectedPersons.length === 0 &&
+          selectedSystems.length === 0 && (
+            <p className="prop-empty">已選取核心家庭圈，可作為生態連結起點</p>
+          )}
+
+        {selectedSystems.length === 1 && (
+          <EcoSystemProperties system={selectedSystems[0]} />
+        )}
+
+        {selectedEcoLinks.length === 1 && (
+          <EcoLinkProperties link={selectedEcoLinks[0]} />
         )}
 
         {selectedPersons.length === 2 && selectedRels.length === 0 && (

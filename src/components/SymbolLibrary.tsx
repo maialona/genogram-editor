@@ -15,6 +15,7 @@ import {
 } from "../types/relationshipCatalog";
 import { MEDICAL_MARKERS } from "../types/medicalCatalog";
 import { useDocumentStore } from "../store/documentStore";
+import { EcomapSymbolLibrary } from "./EcomapSymbolLibrary";
 
 interface PersonSymbol {
   kind: "person";
@@ -1117,6 +1118,7 @@ function MiniMedical({ marker }: { marker: string }) {
 }
 
 export function SymbolLibrary() {
+  const diagramMode = useDocumentStore((s) => s.diagramMode);
   const setPendingRelationshipType = useDocumentStore(
     (s) => s.setPendingRelationshipType
   );
@@ -1369,11 +1371,19 @@ export function SymbolLibrary() {
     >
       <header className="panel-header symbol-library-header">
         <h2 id={headingId}>符號庫</h2>
-        <p className="symbol-library-sub">拖曳人物 · 點擊關係後選擇兩人</p>
+        <p className="symbol-library-sub">
+          {diagramMode === "ecomap"
+            ? "拖曳系統 · 點選線條樣式後拉到系統"
+            : "拖曳人物 · 點擊關係後選擇兩人"}
+        </p>
       </header>
-      <div className="symbol-library-body">
-        {SECTIONS.map(renderSection)}
-      </div>
+      {diagramMode === "ecomap" ? (
+        <EcomapSymbolLibrary />
+      ) : (
+        <div className="symbol-library-body">
+          {SECTIONS.map(renderSection)}
+        </div>
+      )}
     </aside>
   );
 }

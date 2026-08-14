@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Gender } from "../../types/document";
+import type { EcoSystemCategory, Gender } from "../../types/document";
 import { RELATIONSHIP_LABELS } from "../../types/relationshipCatalog";
+import { ECO_STRENGTH_LABELS, HOUSEHOLD_ID } from "../../types/ecomapCatalog";
 import { useDocumentStore } from "../../store/documentStore";
 import { SvgRenderer } from "../../renderers/SvgRenderer";
 import { Grid } from "../../renderers/Grid";
-import { PERSON_HALF } from "../../renderers/constants";
 import { useAiGenerationStore } from "../../store/aiGenerationStore";
 import { AiConstellationOverlay } from "./AiConstellationOverlay";
+import {
+  endpointPoint,
+  hitTestHousehold,
+  hitTestPerson,
+  hitTestSystem,
+  visiblePeople,
+} from "./canvasHitTest";
 
 const MIN_SCALE = 0.15;
 const MAX_SCALE = 4;
@@ -61,26 +68,6 @@ function screenToWorld(
   };
 }
 
-function hitTestPerson(
-  worldX: number,
-  worldY: number,
-  persons: { id: string; x: number; y: number }[],
-  excludeId?: string
-): string | null {
-  const r = PERSON_HALF + 10;
-  let best: string | null = null;
-  let bestDist = r;
-  for (const p of persons) {
-    if (excludeId && p.id === excludeId) continue;
-    const d = Math.hypot(p.x - worldX, p.y - worldY);
-    if (d <= bestDist) {
-      bestDist = d;
-      best = p.id;
-    }
-  }
-  return best;
-}
-
 function isDeleteKeyEvent(e: { key: string; code: string }): boolean {
   return (
     e.code === "Delete" ||
@@ -113,6 +100,8 @@ export function Canvas() {
   const interactionMode = useDocumentStore((s) => s.interactionMode);
   const connectFromId = useDocumentStore((s) => s.connectFromId);
   const pendingRelationshipType = useDocumentStore((s) => s.pendingRelationshipType);
+  const pendingEcoLink = useDocumentStore((s) => s.pendingEcoLink);
+  const diagramMode = useDocumentStore((s) => s.diagramMode);
   const generationPhase = useAiGenerationStore((s) => s.phase);
   const previewDocument = useAiGenerationStore((s) => s.previewDocument);
 
@@ -126,10 +115,14 @@ export function Canvas() {
   const pushHistory = useDocumentStore((s) => s.pushHistory);
   const persist = useDocumentStore((s) => s.persist);
   const addRelationship = useDocumentStore((s) => s.addRelationship);
+  const addEcoLink = useDocumentStore((s) => s.addEcoLink);
+  const addEcoSystem = useDocumentStore((s) => s.addEcoSystem);
   const setConnectFromId = useDocumentStore((s) => s.setConnectFromId);
   const setInteractionMode = useDocumentStore((s) => s.setInteractionMode);
 
-  const { viewport } = document;
+  const viewport =
+    diagramMode === "ecomap" ? document.ecomapViewport : document.viewport;
+  const people = visiblePeople(document, diagramMode);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -248,10 +241,33 @@ export function Canvas() {
   const completeConnect = useCallback(
     (fromId: string, toId: string) => {
       if (fromId === toId) return;
+      if (diagramMode === "ecomap") {
+        const toIsSystem = document.ecoSystems.some((s) => s.id === toId);
+        const fromIsSystem = document.ecoSystems.some((s) => s.id === fromId);
+        if (toIsSystem && !fromIsSystem) {
+          const from =
+            fromId === HOUSEHOLD_ID
+              ? { kind: "household" as const }
+              : { kind: "person" as const, personId: fromId };
+          addEcoLink(from, toId);
+        } else if (fromIsSystem && toId !== HOUSEHOLD_ID) {
+          addEcoLink({ kind: "person", personId: toId }, fromId);
+        } else if (fromIsSystem && toId === HOUSEHOLD_ID) {
+          addEcoLink({ kind: "household" }, fromId);
+        }
+        setCursorWorld(null);
+        return;
+      }
       addRelationship(fromId, toId, pendingRelationshipType);
       setCursorWorld(null);
     },
-    [addRelationship, pendingRelationshipType]
+    [
+      addRelationship,
+      addEcoLink,
+      pendingRelationshipType,
+      diagramMode,
+      document.ecoSystems,
+    ]
   );
 
   const onPersonPointerDown = useCallback(
@@ -309,8 +325,10 @@ export function Canvas() {
       // If already selected (and not additive), keep current selection
       // so multi-select group drag still works.
 
-      const personIds = nextSelection.filter((id) =>
-        document.persons.some((p) => p.id === id)
+      const personIds = nextSelection.filter(
+        (id) =>
+          people.some((p) => p.id === id) ||
+          document.ecoSystems.some((s) => s.id === id)
       );
       if (personIds.length === 0) personIds.push(personId);
 
@@ -336,7 +354,8 @@ export function Canvas() {
       beginConnectFrom,
       toWorld,
       select,
-      document.persons,
+      people,
+      document.ecoSystems,
       focusCanvas,
       setDragSafe,
     ]
@@ -352,6 +371,115 @@ export function Canvas() {
       select([relationshipId], additive);
     },
     [select, interactionMode, focusCanvas]
+  );
+
+  const onEcoLinkPointerDown = useCallback(
+    (e: React.PointerEvent, linkId: string) => {
+      e.stopPropagation();
+      e.preventDefault();
+      focusCanvas();
+      if (interactionMode === "connect") return;
+      const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+      select([linkId], additive);
+    },
+    [select, interactionMode, focusCanvas]
+  );
+
+  const onHouseholdPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      focusCanvas();
+      const world = toWorld(e.clientX, e.clientY);
+      if (interactionMode === "connect") {
+        if (
+          connectFromId &&
+          connectFromId !== HOUSEHOLD_ID &&
+          dragRef.current.type !== "connect-drag"
+        ) {
+          completeConnect(connectFromId, HOUSEHOLD_ID);
+          return;
+        }
+        beginConnectFrom(HOUSEHOLD_ID, world.x, world.y);
+        return;
+      }
+      select([HOUSEHOLD_ID], e.shiftKey || e.metaKey || e.ctrlKey);
+    },
+    [
+      interactionMode,
+      connectFromId,
+      completeConnect,
+      beginConnectFrom,
+      toWorld,
+      select,
+      focusCanvas,
+    ]
+  );
+
+  const onEcoSystemPointerDown = useCallback(
+    (e: React.PointerEvent, systemId: string) => {
+      e.stopPropagation();
+      e.preventDefault();
+      focusCanvas();
+      const world = toWorld(e.clientX, e.clientY);
+      if (interactionMode === "connect") {
+        if (
+          connectFromId &&
+          connectFromId !== systemId &&
+          dragRef.current.type !== "connect-drag"
+        ) {
+          completeConnect(connectFromId, systemId);
+          return;
+        }
+        beginConnectFrom(systemId, world.x, world.y);
+        return;
+      }
+      const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+      const liveIds = useDocumentStore.getState().selectedIds;
+      const already = liveIds.includes(systemId);
+      let nextSelection = liveIds;
+      if (additive) {
+        select([systemId], true);
+        nextSelection = already
+          ? liveIds.filter((id) => id !== systemId)
+          : [...liveIds, systemId];
+      } else if (!already) {
+        select([systemId]);
+        nextSelection = [systemId];
+      }
+      const nodeIds = nextSelection.filter(
+        (id) =>
+          people.some((p) => p.id === id) ||
+          document.ecoSystems.some((s) => s.id === id)
+      );
+      if (nodeIds.length === 0) nodeIds.push(systemId);
+      setDragSafe({
+        type: "move",
+        startWorldX: world.x,
+        startWorldY: world.y,
+        lastWorldX: world.x,
+        lastWorldY: world.y,
+        personIds: nodeIds,
+        pushedHistory: false,
+      });
+      try {
+        (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    [
+      interactionMode,
+      connectFromId,
+      completeConnect,
+      beginConnectFrom,
+      toWorld,
+      select,
+      people,
+      document.ecoSystems,
+      focusCanvas,
+      setDragSafe,
+    ]
   );
 
   const onPointerDown = useCallback(
@@ -433,17 +561,32 @@ export function Canvas() {
       }
 
       if (current.type === "connect-drag") {
-        const hover = hitTestPerson(
+        const hoverPerson = hitTestPerson(
           world.x,
           world.y,
-          document.persons,
+          people,
           current.fromId
         );
+        const hoverSystem =
+          diagramMode === "ecomap"
+            ? hitTestSystem(
+                world.x,
+                world.y,
+                document.ecoSystems,
+                current.fromId
+              )
+            : null;
+        const hoverHousehold =
+          diagramMode === "ecomap" &&
+          current.fromId !== HOUSEHOLD_ID &&
+          hitTestHousehold(world.x, world.y, document)
+            ? HOUSEHOLD_ID
+            : null;
         setDragSafe({
           ...current,
           worldX: world.x,
           worldY: world.y,
-          hoverPersonId: hover,
+          hoverPersonId: hoverSystem ?? hoverHousehold ?? hoverPerson,
         });
         setCursorWorld(world);
         return;
@@ -487,7 +630,9 @@ export function Canvas() {
       interactionMode,
       connectFromId,
       setViewport,
-      document.persons,
+      people,
+      document,
+      diagramMode,
       pushHistory,
       movePersons,
       getLocalPoint,
@@ -503,7 +648,13 @@ export function Canvas() {
         const world = toWorld(e.clientX, e.clientY);
         const target =
           current.hoverPersonId ??
-          hitTestPerson(world.x, world.y, document.persons, current.fromId);
+          hitTestSystem(world.x, world.y, document.ecoSystems, current.fromId) ??
+          (diagramMode === "ecomap" &&
+          current.fromId !== HOUSEHOLD_ID &&
+          hitTestHousehold(world.x, world.y, document)
+            ? HOUSEHOLD_ID
+            : null) ??
+          hitTestPerson(world.x, world.y, people, current.fromId);
 
         if (target) {
           completeConnect(current.fromId, target);
@@ -540,11 +691,20 @@ export function Canvas() {
           }
         } else {
           const hits: string[] = [];
-          for (const p of document.persons) {
+          for (const p of people) {
             const sx = p.x * viewport.scale + viewport.offsetX;
             const sy = p.y * viewport.scale + viewport.offsetY;
             if (sx >= x1 && sx <= x2 && sy >= y1 && sy <= y2) {
               hits.push(p.id);
+            }
+          }
+          if (diagramMode === "ecomap") {
+            for (const s of document.ecoSystems) {
+              const sx = s.x * viewport.scale + viewport.offsetX;
+              const sy = s.y * viewport.scale + viewport.offsetY;
+              if (sx >= x1 && sx <= x2 && sy >= y1 && sy <= y2) {
+                hits.push(s.id);
+              }
             }
           }
           if (current.additive) {
@@ -561,7 +721,9 @@ export function Canvas() {
     },
     [
       toWorld,
-      document.persons,
+      people,
+      document,
+      diagramMode,
       completeConnect,
       setConnectFromId,
       persist,
@@ -596,16 +758,22 @@ export function Canvas() {
       const raw = e.dataTransfer.getData("application/genogram-symbol");
       if (!raw) return;
       try {
-        const data = JSON.parse(raw) as { kind: string; gender?: Gender };
+        const data = JSON.parse(raw) as {
+          kind: string;
+          gender?: Gender;
+          category?: EcoSystemCategory;
+        };
+        const world = toWorld(e.clientX, e.clientY);
         if (data.kind === "person" && data.gender) {
-          const world = toWorld(e.clientX, e.clientY);
           addPerson(data.gender, world.x, world.y);
+        } else if (data.kind === "ecoSystem" && data.category) {
+          addEcoSystem(data.category, world.x, world.y);
         }
       } catch {
         /* ignore */
       }
     },
-    [toWorld, addPerson]
+    [toWorld, addPerson, addEcoSystem]
   );
 
   const cursor =
@@ -625,33 +793,37 @@ export function Canvas() {
     };
   }
 
-  const fromPerson =
-    connectFromId || drag.type === "connect-drag"
-      ? document.persons.find(
-          (p) =>
-            p.id ===
-            (drag.type === "connect-drag" ? drag.fromId : connectFromId)
-        )
-      : null;
-
-  const previewTo =
-    drag.type === "connect-drag"
-      ? drag.hoverPersonId
-        ? document.persons.find((p) => p.id === drag.hoverPersonId)
-        : { x: drag.worldX, y: drag.worldY }
-      : cursorWorld;
+  const fromId =
+    drag.type === "connect-drag" ? drag.fromId : connectFromId;
+  const fromPoint = fromId ? endpointPoint(fromId, {
+    ...document,
+    persons: people,
+  }) : null;
 
   const hoverId =
     drag.type === "connect-drag"
       ? drag.hoverPersonId
       : connectFromId && cursorWorld
-        ? hitTestPerson(
+        ? hitTestSystem(
             cursorWorld.x,
             cursorWorld.y,
-            document.persons,
+            document.ecoSystems,
             connectFromId
-          )
+          ) ??
+          (diagramMode === "ecomap" &&
+          connectFromId !== HOUSEHOLD_ID &&
+          hitTestHousehold(cursorWorld.x, cursorWorld.y, document)
+            ? HOUSEHOLD_ID
+            : null) ??
+          hitTestPerson(cursorWorld.x, cursorWorld.y, people, connectFromId)
         : null;
+
+  const previewTo =
+    drag.type === "connect-drag"
+      ? hoverId
+        ? endpointPoint(hoverId, { ...document, persons: people })
+        : { x: drag.worldX, y: drag.worldY }
+      : cursorWorld;
 
   return (
     <div
@@ -659,7 +831,7 @@ export function Canvas() {
       className="canvas-container"
       style={{ cursor }}
       tabIndex={0}
-      aria-label="家系圖畫布"
+      aria-label={diagramMode === "ecomap" ? "生態圖畫布" : "家系圖畫布"}
       aria-busy={
         generationPhase !== "idle" && generationPhase !== "error"
       }
@@ -681,7 +853,11 @@ export function Canvas() {
         height={size.height}
         style={{ display: "block", width: "100%", height: "100%" }}
         role="img"
-        aria-label={`家系圖，共 ${document.persons.length} 位人物、${document.relationships.length} 條關係`}
+        aria-label={
+          diagramMode === "ecomap"
+            ? `生態圖，共 ${document.householdPersonIds.length} 位核心家庭成員、${document.ecoSystems.length} 個系統`
+            : `家系圖，共 ${document.persons.length} 位人物、${document.relationships.length} 條關係`
+        }
       >
         <Grid viewport={viewport} width={size.width} height={size.height} />
 
@@ -691,19 +867,28 @@ export function Canvas() {
           <SvgRenderer
             document={document}
             selectedIds={selectedIds}
-            connectFromId={
-              drag.type === "connect-drag" ? drag.fromId : connectFromId
+            connectFromId={fromId}
+            hoverPersonId={
+              hoverId && people.some((p) => p.id === hoverId) ? hoverId : null
             }
-            hoverPersonId={hoverId}
+            hoverEcoSystemId={
+              hoverId && document.ecoSystems.some((s) => s.id === hoverId)
+                ? hoverId
+                : null
+            }
+            diagramMode={diagramMode}
             onPersonPointerDown={onPersonPointerDown}
             onRelationshipPointerDown={onRelationshipPointerDown}
+            onHouseholdPointerDown={onHouseholdPointerDown}
+            onEcoSystemPointerDown={onEcoSystemPointerDown}
+            onEcoLinkPointerDown={onEcoLinkPointerDown}
           />
 
-          {fromPerson && previewTo && (
+          {fromPoint && previewTo && (
             <g className="connect-preview" pointerEvents="none">
               <line
-                x1={fromPerson.x}
-                y1={fromPerson.y}
+                x1={fromPoint.x}
+                y1={fromPoint.y}
                 x2={previewTo.x}
                 y2={previewTo.y}
                 stroke="#3b82f6"
@@ -712,8 +897,8 @@ export function Canvas() {
                 opacity={0.9}
               />
               <circle
-                cx={fromPerson.x}
-                cy={fromPerson.y}
+                cx={fromPoint.x}
+                cy={fromPoint.y}
                 r={4}
                 fill="#3b82f6"
               />
@@ -736,6 +921,14 @@ export function Canvas() {
         )}
       </svg>
 
+      {diagramMode === "ecomap" &&
+        document.ecoSystems.length === 0 &&
+        document.householdPersonIds.length === 0 && (
+          <div className="ecomap-empty-hint">
+            先把核心家庭加入中央圈，再從左側加入學校、職場等系統。
+          </div>
+        )}
+
       <AiConstellationOverlay
         phase={generationPhase}
         previewDocument={previewDocument}
@@ -747,12 +940,18 @@ export function Canvas() {
         <div className="canvas-hint">
           <span>
             <strong className="hint-type">
-              {REL_LABELS[pendingRelationshipType]}
+              {diagramMode === "ecomap"
+                ? `${ECO_STRENGTH_LABELS[pendingEcoLink.strength]}連結`
+                : REL_LABELS[pendingRelationshipType]}
             </strong>
             {" · "}
             {connectFromId || drag.type === "connect-drag"
-              ? "拖到或點擊第二個人物完成連線"
-              : "從人物拖曳到另一人物（或點一下再點一下）"}
+              ? diagramMode === "ecomap"
+                ? "拖到系統、人物或家庭圈完成連線"
+                : "拖到或點擊第二個人物完成連線"
+              : diagramMode === "ecomap"
+                ? "從家庭圈或人物拉到外部系統"
+                : "從人物拖曳到另一人物（或點一下再點一下）"}
             {" · "}
             <button
               type="button"

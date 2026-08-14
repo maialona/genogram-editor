@@ -10,3 +10,13 @@ test("system prompt requires adoption, twins, complete child links, and final co
   assert.match(prompt, /每一位.*子女/);
   assert.match(prompt, /最終狀態/);
 });
+
+test("system prompt asks for ecomap fields when external systems are described", () => {
+  const prompt = buildSystemPrompt();
+
+  assert.match(prompt, /diagramMode/);
+  assert.match(prompt, /ecoSystems/);
+  assert.match(prompt, /ecoLinks/);
+  assert.match(prompt, /householdPersonIds/);
+  assert.match(prompt, /extendedFamily/);
+});

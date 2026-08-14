@@ -48,6 +48,79 @@ test("generation controller advances phases, previews, then commits", async () =
   assert.equal(committed, true);
 });
 
+test("family-only model output still commits an ecomap when the user asked for one", async () => {
+  let committedSystems = 0;
+  let committedMode = "";
+
+  await runAiGeneration({
+    description:
+      "請畫生態圖。小明 30 歲，妻子美華，女兒小華上幼兒園適應有壓力。小明和朋友互相支持。小明在工廠上班連結弱。全家已不再參加籃球社。",
+    settings,
+    signal: new AbortController().signal,
+    timings: { structuringMs: 1, linkingMs: 2, minimumMs: 0, revealMs: 0 },
+    generate: async () => ({
+      draft: {
+        persons: [
+          { id: "p1", name: "小明", gender: "male", generation: 0, indexPerson: true },
+          { id: "p2", name: "美華", gender: "female", generation: 0 },
+          { id: "p3", name: "小華", gender: "female", generation: 1 },
+        ],
+        relationships: [
+          { from: "p1", to: "p2", type: "marriage" },
+          { from: "p1", to: "p3", type: "parent" },
+          { from: "p2", to: "p3", type: "parent" },
+        ],
+      },
+      warnings: [],
+      rawContent: "{}",
+    }),
+    onPreview: () => {},
+    onCommit: (document) => {
+      committedMode = String(document.meta?.diagramMode ?? "");
+      committedSystems = document.ecoSystems.length;
+    },
+  });
+
+  assert.equal(committedMode, "ecomap");
+  assert.equal(committedSystems, 4);
+});
+
+test("generation controller layouts an ecomap draft into ecomap mode", async () => {
+  const ecomapResult: AiGenerateResult = {
+    draft: {
+      diagramMode: "ecomap",
+      persons: [
+        { id: "p1", name: "小明", gender: "male", generation: 0, indexPerson: true },
+      ],
+      relationships: [],
+      householdPersonIds: ["p1"],
+      ecoSystems: [{ id: "s1", label: "教會", category: "religion" }],
+      ecoLinks: [{ from: { kind: "household" }, to: "s1", strength: "strong" }],
+    },
+    warnings: [],
+    rawContent: "{}",
+  };
+
+  let committedMode: string | undefined;
+  let systemCount = 0;
+
+  await runAiGeneration({
+    description: "請畫生態圖",
+    settings,
+    signal: new AbortController().signal,
+    timings: { structuringMs: 1, linkingMs: 2, minimumMs: 0, revealMs: 0 },
+    generate: async () => ecomapResult,
+    onPreview: () => {},
+    onCommit: (document) => {
+      committedMode = String(document.meta?.diagramMode ?? "");
+      systemCount = document.ecoSystems.length;
+    },
+  });
+
+  assert.equal(committedMode, "ecomap");
+  assert.equal(systemCount, 1);
+});
+
 test("generation controller never previews or commits after abort", async () => {
   const controller = new AbortController();
   let previewed = false;

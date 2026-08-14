@@ -23,7 +23,7 @@ export function exportJson(doc: Document): void {
     meta: {
       ...doc.meta,
       exportedAt: Date.now(),
-      format: "genogram-editor-v1",
+      format: "genogram-editor-v2",
     },
   };
   downloadText(

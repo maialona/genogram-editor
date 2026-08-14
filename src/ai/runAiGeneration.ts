@@ -1,4 +1,5 @@
 import { generateGenogramDraft } from "./client";
+import { ensureEcomapDraft } from "./diagramIntent";
 import { layoutGenogram } from "./layoutGenogram";
 import type { AiGenerationPhase } from "../store/aiGenerationStore";
 import type { Document } from "../types/document";
@@ -74,7 +75,13 @@ export async function runAiGeneration({
   ];
 
   try {
-    const result = await generate(description, settings, signal);
+    const generated = await generate(description, settings, signal);
+    const ensured = ensureEcomapDraft(generated.draft, description);
+    const result: AiGenerateResult = {
+      ...generated,
+      draft: ensured.draft,
+      warnings: [...generated.warnings, ...ensured.warnings],
+    };
     const elapsed = Date.now() - startedAt;
     await wait(Math.max(0, timings.minimumMs - elapsed), signal);
     if (signal.aborted) throw abortError();
