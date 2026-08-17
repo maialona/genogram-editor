@@ -731,9 +731,15 @@
   height: 22px;
 }
 
-.symbol-item[data-kind="relationship"] .symbol-icon svg {
+.symbol-item[data-kind="relationship"] .symbol-icon svg,
+.symbol-item[data-kind="ecoLink"] .symbol-icon svg {
   width: 28px;
   height: 15px;
+}
+
+.symbol-item[data-kind="ecoSystem"] .symbol-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* 醫療（彩色）：保留淺色底，色塊辨識度不變 */

@@ -7,6 +7,7 @@ import { SvgRenderer } from "../../renderers/SvgRenderer";
 import { Grid } from "../../renderers/Grid";
 import { useAiGenerationStore } from "../../store/aiGenerationStore";
 import { AiConstellationOverlay } from "./AiConstellationOverlay";
+import { resolveEcomapConnect } from "./ecoConnect";
 import {
   endpointPoint,
   hitTestHousehold,
@@ -242,18 +243,15 @@ export function Canvas() {
     (fromId: string, toId: string) => {
       if (fromId === toId) return;
       if (diagramMode === "ecomap") {
-        const toIsSystem = document.ecoSystems.some((s) => s.id === toId);
-        const fromIsSystem = document.ecoSystems.some((s) => s.id === fromId);
-        if (toIsSystem && !fromIsSystem) {
-          const from =
-            fromId === HOUSEHOLD_ID
-              ? { kind: "household" as const }
-              : { kind: "person" as const, personId: fromId };
-          addEcoLink(from, toId);
-        } else if (fromIsSystem && toId !== HOUSEHOLD_ID) {
-          addEcoLink({ kind: "person", personId: toId }, fromId);
-        } else if (fromIsSystem && toId === HOUSEHOLD_ID) {
-          addEcoLink({ kind: "household" }, fromId);
+        const action = resolveEcomapConnect(
+          fromId,
+          toId,
+          new Set(document.ecoSystems.map((s) => s.id))
+        );
+        if (action.kind === "ecoLink") {
+          addEcoLink(action.from, action.to);
+        } else if (action.kind === "relationship") {
+          addRelationship(action.from, action.to, pendingRelationshipType);
         }
         setCursorWorld(null);
         return;
@@ -941,16 +939,16 @@ export function Canvas() {
           <span>
             <strong className="hint-type">
               {diagramMode === "ecomap"
-                ? `${ECO_STRENGTH_LABELS[pendingEcoLink.strength]}連結`
+                ? `${REL_LABELS[pendingRelationshipType]}／${ECO_STRENGTH_LABELS[pendingEcoLink.strength]}連結`
                 : REL_LABELS[pendingRelationshipType]}
             </strong>
             {" · "}
             {connectFromId || drag.type === "connect-drag"
               ? diagramMode === "ecomap"
-                ? "拖到系統、人物或家庭圈完成連線"
+                ? "拖到另一人物建立家庭關係，或拖到系統完成生態連結"
                 : "拖到或點擊第二個人物完成連線"
               : diagramMode === "ecomap"
-                ? "從家庭圈或人物拉到外部系統"
+                ? "從人物拉到另一人物，或從家庭圈／人物拉到外部系統"
                 : "從人物拖曳到另一人物（或點一下再點一下）"}
             {" · "}
             <button

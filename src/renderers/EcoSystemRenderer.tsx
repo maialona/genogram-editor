@@ -2,6 +2,7 @@ import type { EcoSystem } from "../types/document";
 import { ECO_SYSTEM_LABELS } from "../types/ecomapCatalog";
 import { ECO_SYSTEM_RADIUS } from "./ecomapLayout";
 import { SELECTION_COLOR, TEXT_COLOR } from "./constants";
+import { EcoSystemGlyphPaths } from "./ecoSystemIcons";
 
 export interface EcoSystemRendererProps {
   system: EcoSystem;
@@ -22,9 +23,10 @@ export function EcoSystemRenderer({
     <g
       className="eco-system"
       data-id={system.id}
+      data-category={system.category}
       transform={`translate(${system.x}, ${system.y})`}
       onPointerDown={(e) => onPointerDown?.(e, system.id)}
-      style={{ cursor: "pointer" }}
+      style={{ cursor: "pointer", color: stroke }}
     >
       {highlighted || selected ? (
         <circle
@@ -41,11 +43,18 @@ export function EcoSystemRenderer({
         stroke={stroke}
         strokeWidth={selected ? 2.5 : 1.75}
       />
+      <g
+        className="eco-system-glyph"
+        transform="translate(-11 -12.5) scale(0.92)"
+        aria-hidden="true"
+      >
+        <EcoSystemGlyphPaths category={system.category} />
+      </g>
       <text
-        y={4}
+        y={ECO_SYSTEM_RADIUS + 14}
         textAnchor="middle"
         fill={TEXT_COLOR}
-        fontSize={12}
+        fontSize={11}
         fontFamily="system-ui, sans-serif"
       >
         {truncateLabel(label, 6)}

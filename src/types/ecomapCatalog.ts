@@ -3,6 +3,7 @@ import type {
   EcoLinkQuality,
   EcoLinkStrength,
   EcoSystemCategory,
+  RelationshipType,
 } from "./document";
 
 /** Reserved selectable id for the household circle endpoint. */
@@ -31,6 +32,24 @@ export const ECO_SYSTEM_PRESETS: {
   category,
   label: ECO_SYSTEM_LABELS[category],
 }));
+
+/** Family ties the ecomap view actually draws inside the household circle. */
+export const ECO_FAMILY_REL_OPTIONS: {
+  value: Extract<
+    RelationshipType,
+    "marriage" | "parent" | "adoptiveParent" | "twin"
+  >;
+  label: string;
+}[] = [
+  { value: "marriage", label: "婚姻" },
+  { value: "parent", label: "親子" },
+  { value: "adoptiveParent", label: "收養親子" },
+  { value: "twin", label: "雙胞胎" },
+];
+
+export const ECO_FAMILY_REL_TYPES = new Set<RelationshipType>(
+  ECO_FAMILY_REL_OPTIONS.map((o) => o.value)
+);
 
 export const ECO_STRENGTH_OPTIONS: {
   value: EcoLinkStrength;

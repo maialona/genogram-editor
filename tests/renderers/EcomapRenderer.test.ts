@@ -20,6 +20,8 @@ test("sample ecomap renders household, systems, and links", () => {
   assert.match(markup, /class="household-circle"/);
   assert.match(markup, /核心家庭/);
   assert.equal((markup.match(/class="eco-system"/g) ?? []).length, 4);
+  assert.equal((markup.match(/class="eco-system-glyph"/g) ?? []).length, 4);
+  assert.match(markup, /data-category="school"/);
   assert.equal((markup.match(/class="eco-link"/g) ?? []).length, 4);
   assert.match(markup, /小明/);
 });

@@ -1,7 +1,7 @@
 import { Network, Sparkles, Share2, ShieldCheck, ArrowRight } from "lucide-react";
 import "./LandingPage.css";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.2.0";
 
 interface LandingPageProps {
   onGetStarted: () => void;

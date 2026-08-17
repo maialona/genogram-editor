@@ -11,6 +11,7 @@ import {
 import { useDocumentStore } from "../store/documentStore";
 import type { DiagramMode, RelationshipType } from "../types/document";
 import { ALL_REL_OPTIONS } from "../types/relationshipCatalog";
+import { ECO_FAMILY_REL_OPTIONS } from "../types/ecomapCatalog";
 
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
 
@@ -149,7 +150,11 @@ export function CanvasToolbar() {
                 : "canvas-tool"
             }
             aria-pressed={interactionMode === "connect"}
-            title="拉線：從人物拖到另一人物"
+            title={
+              diagramMode === "ecomap"
+                ? "拉線：人與人建立家庭關係，人或家庭圈連到系統"
+                : "拉線：從人物拖到另一人物"
+            }
             aria-label="拉線工具"
             onClick={() => setPendingRelationshipType(pendingRelationshipType)}
           >
@@ -232,7 +237,10 @@ export function CanvasToolbar() {
               }
               title="目前拉線的關係類型"
             >
-              {ALL_REL_OPTIONS.map((o) => (
+              {(diagramMode === "ecomap"
+                ? ECO_FAMILY_REL_OPTIONS
+                : ALL_REL_OPTIONS
+              ).map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

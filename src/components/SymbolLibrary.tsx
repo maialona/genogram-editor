@@ -16,6 +16,7 @@ import {
 import { MEDICAL_MARKERS } from "../types/medicalCatalog";
 import { useDocumentStore } from "../store/documentStore";
 import { EcomapSymbolLibrary } from "./EcomapSymbolLibrary";
+import { MiniPerson } from "./MiniPerson";
 
 interface PersonSymbol {
   kind: "person";
@@ -250,43 +251,6 @@ const SYM = {
   fill: "var(--sym-fill, #fff)",
   ink: "currentColor",
 } as const;
-
-function MiniPerson({ gender }: { gender: Gender }) {
-  const s = 22;
-  const h = s / 2;
-  if (gender === "male") {
-    return (
-      <svg width={28} height={28} viewBox="-14 -14 28 28">
-        <rect
-          x={-h}
-          y={-h}
-          width={s}
-          height={s}
-          fill={SYM.fill}
-          stroke={SYM.stroke}
-          strokeWidth={2}
-        />
-      </svg>
-    );
-  }
-  if (gender === "female") {
-    return (
-      <svg width={28} height={28} viewBox="-14 -14 28 28">
-        <circle r={h} fill={SYM.fill} stroke={SYM.stroke} strokeWidth={2} />
-      </svg>
-    );
-  }
-  return (
-    <svg width={28} height={28} viewBox="-14 -14 28 28">
-      <path
-        d={`M 0 ${-h} L ${h} 0 L 0 ${h} L ${-h} 0 Z`}
-        fill={SYM.fill}
-        stroke={SYM.stroke}
-        strokeWidth={2}
-      />
-    </svg>
-  );
-}
 
 function LegendMark({ kind }: { kind: (typeof FAMILY_REL_LEGEND)[number]["key"] }) {
   if (kind === "biological") {
@@ -1373,7 +1337,7 @@ export function SymbolLibrary() {
         <h2 id={headingId}>符號庫</h2>
         <p className="symbol-library-sub">
           {diagramMode === "ecomap"
-            ? "拖曳系統 · 點選線條樣式後拉到系統"
+            ? "拖曳人物或系統 · 點選關係後拉到兩人或系統"
             : "拖曳人物 · 點擊關係後選擇兩人"}
         </p>
       </header>

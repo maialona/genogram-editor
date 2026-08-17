@@ -36,8 +36,11 @@ import {
   viewportToFitContent,
   type ContentBounds,
 } from "../utils/viewport";
-import { HOUSEHOLD_ID } from "../types/ecomapCatalog";
-import { ECO_SYSTEM_LABELS } from "../types/ecomapCatalog";
+import {
+  ECO_FAMILY_REL_TYPES,
+  ECO_SYSTEM_LABELS,
+  HOUSEHOLD_ID,
+} from "../types/ecomapCatalog";
 import {
   ECO_SYSTEM_RADIUS,
   personEcomapPosition,
@@ -60,6 +63,7 @@ interface ClipboardData {
 }
 
 export type InteractionMode = "select" | "pan" | "connect";
+export type ConnectIntent = "family" | "eco";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export interface PendingEcoLink {
@@ -77,6 +81,8 @@ interface DocumentStore {
   /** When connecting: first person id, household, or null. */
   connectFromId: string | null;
   pendingRelationshipType: RelationshipType;
+  /** Which connect palette is active in ecomap mode. */
+  connectIntent: ConnectIntent;
   pendingEcoLink: PendingEcoLink;
   diagramMode: DiagramMode;
   saveStatus: SaveStatus;
@@ -203,7 +209,7 @@ function getEcomapBounds(document: Document): ContentBounds | null {
     minX = Math.min(minX, s.x - ECO_SYSTEM_RADIUS);
     maxX = Math.max(maxX, s.x + ECO_SYSTEM_RADIUS);
     minY = Math.min(minY, s.y - ECO_SYSTEM_RADIUS);
-    maxY = Math.max(maxY, s.y + ECO_SYSTEM_RADIUS + 16);
+    maxY = Math.max(maxY, s.y + ECO_SYSTEM_RADIUS + 22);
   }
   return { minX, minY, maxX, maxY };
 }
@@ -263,6 +269,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => {
     interactionMode: "select",
     connectFromId: null,
     pendingRelationshipType: "marriage",
+    connectIntent: "eco",
     pendingEcoLink: {
       strength: "moderate",
       quality: "supportive",
@@ -537,6 +544,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => {
     setPendingRelationshipType: (type) =>
       set({
         pendingRelationshipType: type,
+        connectIntent: "family",
         interactionMode: "connect",
         connectFromId: null,
       }),
@@ -554,12 +562,17 @@ export const useDocumentStore = create<DocumentStore>((set, get) => {
         ...nextDoc,
         meta: { ...nextDoc.meta, diagramMode: mode },
       };
+      const rel = get().pendingRelationshipType;
       set({
         document,
         diagramMode: mode,
         selectedIds: [],
         connectFromId: null,
         interactionMode: "select",
+        pendingRelationshipType:
+          mode === "ecomap" && !ECO_FAMILY_REL_TYPES.has(rel)
+            ? "marriage"
+            : rel,
       });
       saveDocument(document);
     },
@@ -567,6 +580,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => {
     setPendingEcoLink: (patch) =>
       set({
         pendingEcoLink: { ...get().pendingEcoLink, ...patch },
+        connectIntent: "eco",
         interactionMode: "connect",
         connectFromId: null,
       }),

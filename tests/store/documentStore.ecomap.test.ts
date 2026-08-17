@@ -118,3 +118,29 @@ test("switching to ecomap seeds household and keeps existing coordinates", () =>
   assert.equal(typeof doc.persons.find((p) => p.id === "p2")?.ecomapX, "number");
   assert.equal(useDocumentStore.getState().diagramMode, "ecomap");
 });
+
+test("adding a person in ecomap mode joins the household", () => {
+  reset();
+  useDocumentStore.setState({ diagramMode: "ecomap" });
+  const id = useDocumentStore.getState().addPerson("female", 12, 34);
+  const doc = useDocumentStore.getState().document;
+  const person = doc.persons.find((p) => p.id === id);
+  assert.equal(person?.gender, "female");
+  assert.equal(person?.ecomapX, 12);
+  assert.equal(person?.ecomapY, 34);
+  assert.deepEqual(doc.householdPersonIds, [id]);
+});
+
+test("ecomap mode can add a household family relationship", () => {
+  reset();
+  useDocumentStore.setState({ diagramMode: "ecomap" });
+  const a = useDocumentStore.getState().addPerson("male", 0, 0);
+  const b = useDocumentStore.getState().addPerson("female", 80, 0);
+  useDocumentStore.getState().setPendingRelationshipType("marriage");
+  const relId = useDocumentStore.getState().addRelationship(a, b, "marriage");
+  const rel = useDocumentStore
+    .getState()
+    .document.relationships.find((r) => r.id === relId);
+  assert.equal(rel?.type, "marriage");
+  assert.equal(useDocumentStore.getState().connectIntent, "family");
+});
