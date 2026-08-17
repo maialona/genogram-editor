@@ -32,6 +32,13 @@ test("ecomap symbol library exposes household person glyphs", () => {
   assert.match(markup, /未知性別/);
 });
 
+test("ecomap symbol library sections start collapsed like the genogram accordion", () => {
+  const markup = renderToStaticMarkup(createElement(EcomapSymbolLibrary));
+  assert.equal((markup.match(/symbol-section-toggle/g) ?? []).length, 6);
+  assert.equal((markup.match(/aria-expanded="false"/g) ?? []).length, 6);
+  assert.equal((markup.match(/hidden=""/g) ?? []).length, 6);
+});
+
 test("ecomap symbol library exposes household family relationship glyphs", () => {
   const markup = renderToStaticMarkup(createElement(EcomapSymbolLibrary));
   assert.match(markup, /data-rel="marriage"/);

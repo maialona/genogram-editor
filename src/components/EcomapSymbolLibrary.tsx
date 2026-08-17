@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import {
   ECO_FAMILY_REL_OPTIONS,
   ECO_FLOW_OPTIONS,
@@ -20,6 +22,40 @@ import {
 } from "../renderers/ecomapLayout";
 import { MiniPerson } from "./MiniPerson";
 
+type SectionId =
+  | "persons"
+  | "family"
+  | "systems"
+  | "strength"
+  | "quality"
+  | "flow";
+
+const SECTION_OPEN_KEY = "ecomap-symbol-section-open";
+
+const SECTION_DEFAULTS: Record<SectionId, boolean> = {
+  persons: false,
+  family: false,
+  systems: false,
+  strength: false,
+  quality: false,
+  flow: false,
+};
+
+function loadOpenMap(): Record<SectionId, boolean> {
+  const base = { ...SECTION_DEFAULTS };
+  try {
+    const raw = localStorage.getItem(SECTION_OPEN_KEY);
+    if (!raw) return base;
+    const parsed = JSON.parse(raw) as Partial<Record<SectionId, boolean>>;
+    for (const id of Object.keys(SECTION_DEFAULTS) as SectionId[]) {
+      if (typeof parsed[id] === "boolean") base[id] = parsed[id]!;
+    }
+  } catch {
+    /* ignore corrupt storage */
+  }
+  return base;
+}
+
 const ECO_PERSONS: { gender: Gender; label: string }[] = [
   { gender: "male", label: "男性" },
   { gender: "female", label: "女性" },
@@ -41,6 +77,63 @@ export function EcomapSymbolLibrary() {
   const interactionMode = useDocumentStore((s) => s.interactionMode);
   const viewport = useDocumentStore((s) => s.document.ecomapViewport);
   const canvasSize = useDocumentStore((s) => s.canvasSize);
+  const [openMap, setOpenMap] =
+    useState<Record<SectionId, boolean>>(loadOpenMap);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SECTION_OPEN_KEY, JSON.stringify(openMap));
+    } catch {
+      /* quota / private mode */
+    }
+  }, [openMap]);
+
+  const toggleSection = useCallback((id: SectionId) => {
+    setOpenMap((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const renderSection = (
+    id: SectionId,
+    title: string,
+    count: number,
+    children: ReactNode
+  ) => {
+    const open = openMap[id];
+    const panelId = `ecomap-symbol-section-${id}`;
+    return (
+      <section
+        className={`symbol-section${open ? " is-open" : ""}`}
+        key={id}
+      >
+        <h3 className="symbol-section-heading">
+          <button
+            type="button"
+            className="symbol-section-toggle"
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={() => toggleSection(id)}
+          >
+            <span className="symbol-section-chevron" aria-hidden="true">
+              <ChevronRight size={14} strokeWidth={2.25} />
+            </span>
+            <span className="symbol-section-title-text">{title}</span>
+            <span className="symbol-section-count" aria-hidden="true">
+              {count}
+            </span>
+          </button>
+        </h3>
+        <div
+          id={panelId}
+          className="symbol-section-panel"
+          role="group"
+          aria-label={title}
+          hidden={!open}
+        >
+          {children}
+        </div>
+      </section>
+    );
+  };
 
   const canvasCenter = () => {
     const x = (canvasSize.width / 2 - viewport.offsetX) / viewport.scale;
@@ -70,10 +163,10 @@ export function EcomapSymbolLibrary() {
 
   return (
     <div className="symbol-library-body">
-      <section className="symbol-section is-open">
-        <h3 className="symbol-section-heading">
-          <span className="symbol-section-title-text">人物</span>
-        </h3>
+      {renderSection(
+        "persons",
+        "人物",
+        ECO_PERSONS.length,
         <div className="symbol-grid">
           {ECO_PERSONS.map((preset) => (
             <button
@@ -104,12 +197,12 @@ export function EcomapSymbolLibrary() {
             </button>
           ))}
         </div>
-      </section>
+      )}
 
-      <section className="symbol-section is-open">
-        <h3 className="symbol-section-heading">
-          <span className="symbol-section-title-text">家庭關係</span>
-        </h3>
+      {renderSection(
+        "family",
+        "家庭關係",
+        ECO_FAMILY_REL_OPTIONS.length,
         <div className="symbol-grid">
           {ECO_FAMILY_REL_OPTIONS.map((opt) => (
             <button
@@ -138,12 +231,12 @@ export function EcomapSymbolLibrary() {
             </button>
           ))}
         </div>
-      </section>
+      )}
 
-      <section className="symbol-section is-open">
-        <h3 className="symbol-section-heading">
-          <span className="symbol-section-title-text">外部系統</span>
-        </h3>
+      {renderSection(
+        "systems",
+        "外部系統",
+        ECO_SYSTEM_PRESETS.length,
         <div className="symbol-grid">
           {ECO_SYSTEM_PRESETS.map((preset) => (
             <button
@@ -174,12 +267,12 @@ export function EcomapSymbolLibrary() {
             </button>
           ))}
         </div>
-      </section>
+      )}
 
-      <section className="symbol-section is-open">
-        <h3 className="symbol-section-heading">
-          <span className="symbol-section-title-text">關係強度</span>
-        </h3>
+      {renderSection(
+        "strength",
+        "關係強度",
+        ECO_STRENGTH_OPTIONS.length,
         <div className="symbol-grid">
           {ECO_STRENGTH_OPTIONS.map((opt) => (
             <button
@@ -206,12 +299,12 @@ export function EcomapSymbolLibrary() {
             </button>
           ))}
         </div>
-      </section>
+      )}
 
-      <section className="symbol-section is-open">
-        <h3 className="symbol-section-heading">
-          <span className="symbol-section-title-text">關係品質</span>
-        </h3>
+      {renderSection(
+        "quality",
+        "關係品質",
+        ECO_QUALITY_OPTIONS.length,
         <div className="symbol-grid">
           {ECO_QUALITY_OPTIONS.map((opt) => (
             <button
@@ -238,12 +331,12 @@ export function EcomapSymbolLibrary() {
             </button>
           ))}
         </div>
-      </section>
+      )}
 
-      <section className="symbol-section is-open">
-        <h3 className="symbol-section-heading">
-          <span className="symbol-section-title-text">能量流向</span>
-        </h3>
+      {renderSection(
+        "flow",
+        "能量流向",
+        ECO_FLOW_OPTIONS.length,
         <div className="symbol-grid">
           {ECO_FLOW_OPTIONS.map((opt) => (
             <button
@@ -270,7 +363,7 @@ export function EcomapSymbolLibrary() {
             </button>
           ))}
         </div>
-      </section>
+      )}
     </div>
   );
 }
