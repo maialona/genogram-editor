@@ -89,6 +89,10 @@ export async function generateGenogramDraft(
             model: settings.model,
             temperature: 0.2,
             response_format: { type: "json_object" },
+            // DeepSeek V4 thinks by default, which can exceed serverless time limits.
+            ...(/deepseek/i.test(settings.baseUrl)
+              ? { thinking: { type: "disabled" } }
+              : {}),
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userContent },

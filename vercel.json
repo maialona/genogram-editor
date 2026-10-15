@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/llm-proxy.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "rewrites": [
