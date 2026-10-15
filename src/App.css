@@ -1911,8 +1911,7 @@
   color: #c4c4cc;
 }
 
-.ai-settings-field input,
-.ai-settings-field select {
+.ai-settings-field input {
   appearance: none;
   height: 36px;
   padding: 0 10px;
@@ -1926,30 +1925,132 @@
   outline: none;
 }
 
-.ai-settings-field input:focus,
-.ai-settings-field select:focus {
+.ai-settings-field input:focus {
   border-color: rgba(59, 130, 246, 0.55);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
-.ai-settings-field select {
-  cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, #9b9ba3 50%),
-    linear-gradient(135deg, #9b9ba3 50%, transparent 50%);
-  background-position:
-    calc(100% - 16px) calc(50% - 2px),
-    calc(100% - 11px) calc(50% - 2px);
-  background-size:
-    5px 5px,
-    5px 5px;
-  background-repeat: no-repeat;
-  padding-right: 28px;
+.ai-custom-select {
+  position: relative;
+  width: 100%;
 }
 
-/* Native <option> popup often uses a light OS surface; keep dark text. */
-.ai-settings-field select option {
-  color: #111827;
-  background: #fff;
+.ai-custom-select-trigger {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f4f5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.ai-custom-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.085);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.ai-custom-select-trigger:focus-visible,
+.ai-custom-select.is-open .ai-custom-select-trigger {
+  border-color: rgba(59, 130, 246, 0.72);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.ai-custom-select-trigger svg {
+  flex: 0 0 auto;
+  color: #a1a1aa;
+  transition: transform 160ms ease;
+}
+
+.ai-custom-select.is-open .ai-custom-select-trigger svg {
+  transform: rotate(180deg);
+}
+
+.ai-custom-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 8;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  background: #29292c;
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.ai-custom-select-option {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #dedee3;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 450;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-custom-select-option.is-active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.ai-custom-select-option.is-selected {
+  color: #bfdbfe;
+}
+
+.ai-custom-select-option.is-selected.is-active {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.ai-custom-select-option svg {
+  flex: 0 0 auto;
+  color: #60a5fa;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-custom-select-trigger svg {
+    transition: none;
+  }
+}
+
+.ai-settings-clear-key {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #93c5fd;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ai-settings-clear-key:hover {
+  color: #bfdbfe;
+  text-decoration: underline;
 }
 
 .ai-settings-check {

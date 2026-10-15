@@ -1,4 +1,11 @@
 import { create } from "zustand";
+import {
+  getApiKey,
+  loadApiKeyring,
+  normalizeApiBaseUrl,
+  updateApiKey,
+  type AiApiKeyring,
+} from "./apiKeyring";
 import type { AiProviderId, AiSettings } from "./types";
 
 const STORAGE_KEY = "genogram-editor-ai-settings-v1";
@@ -21,7 +28,7 @@ export const PROVIDER_PRESETS: Record<
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
     defaultModel: "gpt-6-luna",
-    models: ["gpt-6-luna", "gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+    models: ["gpt-6-luna"],
   },
   deepseek: {
     label: "DeepSeek",
@@ -45,11 +52,33 @@ const DEFAULT_SETTINGS: AiSettings = {
   useProxy: true,
 };
 
-function loadSettings(): AiSettings {
+interface PersistedAiSettings extends Partial<AiSettings> {
+  apiKeys?: unknown;
+  customBaseUrl?: unknown;
+  customModel?: unknown;
+}
+
+interface LoadedSettings {
+  settings: AiSettings;
+  apiKeys: AiApiKeyring;
+  customBaseUrl: string;
+  customModel: string;
+}
+
+function defaultLoadedSettings(): LoadedSettings {
+  return {
+    settings: { ...DEFAULT_SETTINGS },
+    apiKeys: {},
+    customBaseUrl: "",
+    customModel: "",
+  };
+}
+
+function loadSettings(): LoadedSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_SETTINGS };
-    const parsed = JSON.parse(raw) as Partial<AiSettings>;
+    if (!raw) return defaultLoadedSettings();
+    const parsed = JSON.parse(raw) as PersistedAiSettings;
     const provider: AiProviderId =
       parsed.provider === "openai" ||
       parsed.provider === "deepseek" ||
@@ -61,107 +90,182 @@ function loadSettings(): AiSettings {
 
     const preset =
       provider === "custom" ? null : PROVIDER_PRESETS[provider];
+    const baseUrl =
+      typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()
+        ? normalizeApiBaseUrl(parsed.baseUrl)
+        : (preset?.baseUrl ?? DEFAULT_SETTINGS.baseUrl);
     const storedModel =
       typeof parsed.model === "string" ? parsed.model.trim() : "";
     const model =
-      provider === "openai" && storedModel === "gpt-4o-mini"
+      provider === "openai" && storedModel.startsWith("gpt-4")
         ? PROVIDER_PRESETS.openai.defaultModel
         : storedModel || preset?.defaultModel || DEFAULT_SETTINGS.model;
+    const apiKeys = loadApiKeyring(parsed.apiKeys, {
+      provider,
+      baseUrl,
+      apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+    });
 
     return {
-      apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
-      provider,
-      baseUrl:
-        typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()
-          ? parsed.baseUrl.trim().replace(/\/$/, "")
-          : (preset?.baseUrl ?? DEFAULT_SETTINGS.baseUrl),
-      model,
-      useProxy:
-        typeof parsed.useProxy === "boolean"
-          ? parsed.useProxy
-          : DEFAULT_SETTINGS.useProxy,
+      settings: {
+        apiKey: getApiKey(apiKeys, provider, baseUrl),
+        provider,
+        baseUrl,
+        model,
+        useProxy:
+          typeof parsed.useProxy === "boolean"
+            ? parsed.useProxy
+            : DEFAULT_SETTINGS.useProxy,
+      },
+      apiKeys,
+      customBaseUrl:
+        typeof parsed.customBaseUrl === "string"
+          ? normalizeApiBaseUrl(parsed.customBaseUrl)
+          : provider === "custom"
+            ? baseUrl
+            : "",
+      customModel:
+        typeof parsed.customModel === "string"
+          ? parsed.customModel.trim()
+          : provider === "custom"
+            ? model
+            : "",
     };
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    return defaultLoadedSettings();
   }
 }
 
-function persist(settings: AiSettings) {
+function persist(
+  settings: AiSettings,
+  apiKeys: AiApiKeyring,
+  customBaseUrl: string,
+  customModel: string
+) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        provider: settings.provider,
+        baseUrl: settings.baseUrl,
+        model: settings.model,
+        useProxy: settings.useProxy,
+        apiKeys,
+        customBaseUrl,
+        customModel,
+      })
+    );
   } catch {
     // ignore quota / private mode
   }
 }
 
 interface AiSettingsStore extends AiSettings {
+  apiKeys: AiApiKeyring;
+  customBaseUrl: string;
+  customModel: string;
+  getApiKey: (provider: AiProviderId, baseUrl: string) => string;
   setApiKey: (apiKey: string) => void;
   setProvider: (provider: AiProviderId) => void;
   setBaseUrl: (baseUrl: string) => void;
   setModel: (model: string) => void;
   setUseProxy: (useProxy: boolean) => void;
-  saveAll: (partial: Partial<AiSettings>) => void;
+  saveAll: (partial: Partial<AiSettings>, apiKeys?: AiApiKeyring) => void;
   hasApiKey: () => boolean;
 }
 
 export const useAiSettingsStore = create<AiSettingsStore>((set, get) => {
   const initial = loadSettings();
   return {
-    ...initial,
+    ...initial.settings,
+    apiKeys: initial.apiKeys,
+    customBaseUrl: initial.customBaseUrl,
+    customModel: initial.customModel,
+
+    getApiKey: (provider, baseUrl) =>
+      getApiKey(get().apiKeys, provider, baseUrl),
 
     setApiKey: (apiKey) => {
-      const next = { ...snapshot(get()), apiKey };
-      persist(next);
-      set({ apiKey });
+      const cleaned = apiKey.trim();
+      const apiKeys = updateApiKey(
+        get().apiKeys,
+        get().provider,
+        get().baseUrl,
+        cleaned
+      );
+      const next = { ...snapshot(get()), apiKey: cleaned };
+      persist(next, apiKeys, get().customBaseUrl, get().customModel);
+      set({ apiKey: cleaned, apiKeys });
     },
 
     setProvider: (provider) => {
       const preset =
         provider === "custom" ? null : PROVIDER_PRESETS[provider];
+      const baseUrl = preset?.baseUrl ?? get().customBaseUrl;
+      const model = preset?.defaultModel ?? get().customModel;
       const next: AiSettings = {
-        apiKey: get().apiKey,
+        apiKey: getApiKey(get().apiKeys, provider, baseUrl),
         provider,
-        baseUrl: preset?.baseUrl ?? get().baseUrl,
-        model: preset?.defaultModel ?? get().model,
+        baseUrl,
+        model,
         useProxy: get().useProxy,
       };
-      persist(next);
+      persist(next, get().apiKeys, get().customBaseUrl, get().customModel);
       set(next);
     },
 
     setBaseUrl: (baseUrl) => {
-      const cleaned = baseUrl.trim().replace(/\/$/, "");
+      const cleaned = normalizeApiBaseUrl(baseUrl);
       const next: AiSettings = {
         ...snapshot(get()),
+        apiKey: getApiKey(get().apiKeys, "custom", cleaned),
         baseUrl: cleaned,
         provider: "custom",
       };
-      persist(next);
-      set({ baseUrl: cleaned, provider: "custom" });
+      persist(next, get().apiKeys, cleaned, get().customModel);
+      set({ ...next, customBaseUrl: cleaned });
     },
 
     setModel: (model) => {
       const next = { ...snapshot(get()), model: model.trim() };
-      persist(next);
-      set({ model: model.trim() });
+      const customModel =
+        get().provider === "custom" ? model.trim() : get().customModel;
+      persist(next, get().apiKeys, get().customBaseUrl, customModel);
+      set({ model: model.trim(), customModel });
     },
 
     setUseProxy: (useProxy) => {
       const next = { ...snapshot(get()), useProxy };
-      persist(next);
+      persist(next, get().apiKeys, get().customBaseUrl, get().customModel);
       set({ useProxy });
     },
 
-    saveAll: (partial) => {
+    saveAll: (partial, draftApiKeys) => {
+      const provider = partial.provider ?? get().provider;
+      const baseUrl = normalizeApiBaseUrl(partial.baseUrl ?? get().baseUrl);
+      const sourceApiKeys = draftApiKeys ?? get().apiKeys;
+      const apiKey = (
+        partial.apiKey ?? getApiKey(sourceApiKeys, provider, baseUrl)
+      ).trim();
+      const apiKeys = updateApiKey(
+        sourceApiKeys,
+        provider,
+        baseUrl,
+        apiKey
+      );
       const next: AiSettings = {
-        apiKey: partial.apiKey ?? get().apiKey,
-        provider: partial.provider ?? get().provider,
-        baseUrl: (partial.baseUrl ?? get().baseUrl).replace(/\/$/, ""),
+        apiKey,
+        provider,
+        baseUrl,
         model: partial.model ?? get().model,
         useProxy: partial.useProxy ?? get().useProxy,
       };
-      persist(next);
-      set(next);
+      const customBaseUrl =
+        provider === "custom" ? baseUrl : get().customBaseUrl;
+      const customModel =
+        provider === "custom" ? next.model : get().customModel;
+      persist(next, apiKeys, customBaseUrl, customModel);
+      set({ ...next, apiKeys, customBaseUrl, customModel });
     },
 
     hasApiKey: () => get().apiKey.trim().length > 0,
