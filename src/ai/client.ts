@@ -118,6 +118,9 @@ export async function generateGenogramDraft(
           })
         : JSON.stringify({
             model: settings.model,
+            ...(settings.provider === "openai" && settings.model === "gpt-6-luna"
+              ? { reasoning_effort: "none" }
+              : {}),
             temperature: 0.2,
             response_format: { type: "json_object" },
             // DeepSeek V4 thinks by default, which can exceed serverless time limits.

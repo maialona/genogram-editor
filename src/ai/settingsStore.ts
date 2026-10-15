@@ -20,8 +20,8 @@ export const PROVIDER_PRESETS: Record<
   openai: {
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
-    defaultModel: "gpt-4o-mini",
-    models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+    defaultModel: "gpt-6-luna",
+    models: ["gpt-6-luna", "gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
   },
   deepseek: {
     label: "DeepSeek",
@@ -61,6 +61,12 @@ function loadSettings(): AiSettings {
 
     const preset =
       provider === "custom" ? null : PROVIDER_PRESETS[provider];
+    const storedModel =
+      typeof parsed.model === "string" ? parsed.model.trim() : "";
+    const model =
+      provider === "openai" && storedModel === "gpt-4o-mini"
+        ? PROVIDER_PRESETS.openai.defaultModel
+        : storedModel || preset?.defaultModel || DEFAULT_SETTINGS.model;
 
     return {
       apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
@@ -69,10 +75,7 @@ function loadSettings(): AiSettings {
         typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()
           ? parsed.baseUrl.trim().replace(/\/$/, "")
           : (preset?.baseUrl ?? DEFAULT_SETTINGS.baseUrl),
-      model:
-        typeof parsed.model === "string" && parsed.model.trim()
-          ? parsed.model.trim()
-          : (preset?.defaultModel ?? DEFAULT_SETTINGS.model),
+      model,
       useProxy:
         typeof parsed.useProxy === "boolean"
           ? parsed.useProxy
