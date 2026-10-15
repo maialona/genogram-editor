@@ -34,6 +34,37 @@ function resolveEndpoint(settings: AiSettings): string {
   return `${apiBase}${path}`;
 }
 
+const RETRYABLE_STATUS = new Set([429, 502, 503]);
+const MAX_RETRIES = 2;
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true }
+    );
+  });
+}
+
+/** Retry transient provider overload (e.g. DeepSeek 503 "Service is too busy"). */
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  let response = await fetch(url, init);
+  for (
+    let attempt = 1;
+    attempt <= MAX_RETRIES && RETRYABLE_STATUS.has(response.status);
+    attempt++
+  ) {
+    await sleep(2000 * attempt, init.signal ?? undefined);
+    response = await fetch(url, init);
+  }
+  return response;
+}
+
 /**
  * Call an OpenAI-compatible chat completions API and parse a genogram draft.
  */
@@ -66,7 +97,7 @@ export async function generateGenogramDraft(
   let response: Response;
 
   try {
-    response = await fetch(url, {
+    response = await fetchWithRetry(url, {
       method: "POST",
       headers: isAnthropic
         ? {
